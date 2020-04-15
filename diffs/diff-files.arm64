@@ -1,0 +1,24 @@
+Index: sys/conf/files.arm64
+===================================================================
+--- sys/conf/files.arm64	(revision 359935)
++++ sys/conf/files.arm64	(working copy)
+@@ -235,6 +235,7 @@
+ dev/axgbe/xgbe-dev.c		optional	axgbe
+ dev/axgbe/xgbe-drv.c		optional	axgbe
+ dev/axgbe/xgbe-mdio.c		optional	axgbe
++dev/cadence/if_cgem.c		optional	cgem
+ dev/cpufreq/cpufreq_dt.c	optional	cpufreq fdt
+ dev/iicbus/sy8106a.c		optional	sy8106a fdt
+ dev/iicbus/twsi/mv_twsi.c	optional	twsi fdt
+@@ -333,3 +334,11 @@
+ arm64/rockchip/clk/rk3328_cru.c		optional fdt soc_rockchip_rk3328
+ arm64/rockchip/clk/rk3399_cru.c		optional fdt soc_rockchip_rk3399
+ arm64/rockchip/clk/rk3399_pmucru.c	optional fdt soc_rockchip_rk3399
++
++# Xilinx
++arm64/xilinx/zynqmp_clk.c		optional fdt soc_xilinx_zynq
++arm64/xilinx/zynqmp_dp.c		optional fdt vt soc_xilinx_zynq
++arm64/xilinx/zynqmp_fpga.c		optional fdt soc_xilinx_zynq
++arm64/xilinx/zynqmp_gpio.c		optional fdt gpio soc_xilinx_zynq
++arm64/xilinx/zynqmp_phy.c		optional fdt soc_xilinx_zynq
++arm64/xilinx/zynqmp_pm.c		optional fdt soc_xilinx_zynq
