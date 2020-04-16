@@ -18,7 +18,7 @@ xilinx/	- drivers.  These files belong in sys/arm64/xilinx.
 	zynqmp_phy.c	- SERDES PHY driver, needed by display port driver.
 	zynqmp_phy.h
 	zynqmp_pm.c	- Platform Management driver, talks to both firmware
-	zynqmp_pm.h 	  running at EL1 on ARM and power and clock management
+	zynqmp_pm.h 	  running at EL3 on ARM and power and clock management
 			  firmware running on MicroBlaze PMU (Platform
 			  Management Unit).  FPGA and clock drivers depend on
 			  this.
