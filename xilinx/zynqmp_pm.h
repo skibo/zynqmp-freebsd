@@ -276,6 +276,7 @@
 int zynqmp_pm_get_api_version(uint32_t *);
 int zynqmp_pm_get_chipid(uint32_t *, uint32_t *);
 int zynqmp_pm_get_trustzone_version(uint32_t *);
+int zynqmp_pm_init_finalize(void);
 int zynqmp_pm_query_data(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t *);
 int zynqmp_pm_ioctl(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t *);
 int zynqmp_pm_mmio_write(uint32_t, uint32_t, uint32_t);

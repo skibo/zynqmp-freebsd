@@ -86,6 +86,8 @@ __FBSDID("$FreeBSD$");
 #define PM_MMIO_WRITE			19
 #define PM_MMIO_READ			20
 
+#define PM_INIT_FINALIZE		21
+
 #define PM_FPGA_LOAD			22
 #define PM_FPGA_GET_STATUS		23
 #define PM_GET_CHIPID			24
@@ -294,6 +296,13 @@ zynqmp_pm_get_chipid(uint32_t *idcode, uint32_t *version)
 	}
 
 	return (retv);
+}
+
+int
+zynqmp_pm_init_finalize(void)
+{
+
+	return zynqmp_pm_invoke_fn(PM_INIT_FINALIZE, 0, 0, 0, 0, NULL);
 }
 
 int
