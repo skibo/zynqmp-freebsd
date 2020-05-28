@@ -278,13 +278,13 @@ struct zynqmp_dp_softc {
 #define ZYNQMP_DP_INT_EN			0x03a8
 #define ZYNQMP_DP_INT_DS			0x03ac
 
-#define ZYNQMP_V_BLEND_LAYER0_CONTROL		0xa018
-#define ZYNQMP_V_BLEND_LAYER1_CONTROL		0xa01c
+#define ZYNQMP_V_BLEND_LAYER0_CONTROL		0x0018
+#define ZYNQMP_V_BLEND_LAYER1_CONTROL		0x001c
 #define    ZYNQMP_V_BLEND_LAYER_CONTROL_BYPASS			(1 << 8)
 #define    ZYNQMP_V_BLEND_LAYER_CONTROL_RGB_MODE		(1 << 1)
 #define    ZYNQMP_V_BLEND_LAYER_CONTROL_EN_US			(1 << 0)
 
-#define ZYNQMP_AV_BUF_FORMAT			0xb000
+#define ZYNQMP_AV_BUF_FORMAT			0x0000
 #define    ZYNQMP_AV_BUF_FORMAT_NL_GRAPHX_MASK			(0xf << 8)
 #define    ZYNQMP_AV_BUF_FORMAT_NL_GRAPHX_RGBA8888		(0 << 8)
 #define    ZYNQMP_AV_BUF_FORMAT_NL_GRAPHX_ABGR8888		(1 << 8)
@@ -323,14 +323,14 @@ struct zynqmp_dp_softc {
 #define	   ZYNQMP_AV_BUF_FORMAT_NL_VID_YV16_420_10BPC	22
 #define	   ZYNQMP_AV_BUF_FORMAT_NL_VID_YV16CI_420_10BPC	23
 #define	   ZYNQMP_AV_BUF_FORMAT_NL_VID_YV16CI2_420_10BPC 24
-#define ZYNQMP_AV_CHBUF(n)			(0xb010 + 4 * (n))
+#define ZYNQMP_AV_CHBUF(n)			(0x0010 + 4 * (n))
 #define    ZYNQMP_AV_CHBUF_BURST_LEN_MASK			(0x1f << 2)
 #define    ZYNQMP_AV_CHBUF_BURST_LEN_SHIFT			2
 #define    ZYNQMP_AV_CHBUF_BURST_LEN(n)				((n) << 2)
 #define    ZYNQMP_AV_CHBUF_FLUSH				(1 << 1)
 #define    ZYNQMP_AV_CHBUF_EN					(1 << 0)
-#define ZYNQMP_AV_BUF_STC_CONTROL		0xb02c
-#define ZYNQMP_AV_BUF_OUT_SEL			0xb070
+#define ZYNQMP_AV_BUF_STC_CONTROL		0x002c
+#define ZYNQMP_AV_BUF_OUT_SEL			0x0070
 #define    ZYNQMP_AV_BUF_OUT_SEL_AUD_ST2			(1 << 6)
 #define    ZYNQMP_AV_BUF_OUT_SEL_AUD_ST1_MASK			(3 << 4)
 #define    ZYNQMP_AV_BUF_OUT_SEL_AUD_ST1_LIVE			(0 << 4)
@@ -347,7 +347,7 @@ struct zynqmp_dp_softc {
 #define    ZYNQMP_AV_BUF_OUT_SEL_VID_ST1_MEM			1
 #define    ZYNQMP_AV_BUF_OUT_SEL_VID_ST1_PATT			2
 #define    ZYNQMP_AV_BUF_OUT_SEL_VID_ST1_NONE			3
-#define ZYNQMP_AV_BUF_AUD_VID_CLK_SRC		0xb120
+#define ZYNQMP_AV_BUF_AUD_VID_CLK_SRC		0x0120
 #define    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_VID_TIMING_PS		(1 << 2)
 #define    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_AUD_CLK_PS		(1 << 1)
 #define    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_VID_CLK_PS		(1 << 0)
@@ -441,29 +441,14 @@ struct zynqmp_dp_softc {
 static int zynqmp_dp_attach(device_t);
 static int zynqmp_dp_detach(device_t);
 
-
-/* XXX: ugly but for now... */
-inline uint32_t
-RD4(struct zynqmp_dp_softc *sc, uint32_t off)
-{
-	int i = 0;
-	if ((off >> 12) != 0) {
-		i = (off >> 12) - 9;
-		off &= 0xfff;
-	}
-	return bus_read_4(sc->mem_res[i], off);
-}
-
-inline void
-WR4(struct zynqmp_dp_softc *sc, uint32_t off, uint32_t val)
-{
-	int i = 0;
-	if ((off >> 12) != 0) {
-		i = (off >> 12) - 9;
-		off &= 0xfff;
-	}
-	bus_write_4(sc->mem_res[i], off, val);
-}
+#define RD4_DP(sc, off)		(bus_read_4((sc)->mem_res[0], (off)))
+#define WR4_DP(sc, off, val)	(bus_write_4((sc)->mem_res[0], (off), (val)))
+#define RD4_VB(sc, off)		(bus_read_4((sc)->mem_res[1], (off)))
+#define WR4_VB(sc, off, val)	(bus_write_4((sc)->mem_res[1], (off), (val)))
+#define RD4_AV(sc, off)		(bus_read_4((sc)->mem_res[2], (off)))
+#define WR4_AV(sc, off, val)	(bus_write_4((sc)->mem_res[2], (off), (val)))
+#define RD4_AU(sc, off)		(bus_read_4((sc)->mem_res[3], (off)))
+#define WR4_AU(sc, off, val)	(bus_write_4((sc)->mem_res[3], (off), (val)))
 
 static int
 zynqmp_dp_setup_fbd(struct zynqmp_dp_softc *sc)
@@ -542,9 +527,9 @@ zynqmp_dp_dump(SYSCTL_HANDLER_ARGS)
 
 	printf("Dumping registers:\n");
 	printf("  ZYNQMP_DP_PHY_STATUS:\t\t0x%08x\n",
-	    RD4(sc, ZYNQMP_DP_PHY_STATUS));
+	    RD4_DP(sc, ZYNQMP_DP_PHY_STATUS));
 	printf("  ZYNQMP_DP_INT_STATUS:\t\t0x%08x\n",
-	    RD4(sc, ZYNQMP_DP_INT_STATUS));
+	    RD4_DP(sc, ZYNQMP_DP_INT_STATUS));
 
 	printf("Dumping receiver settings:\n");
 	zynqmp_dp_dump_settings(sc);
@@ -617,13 +602,13 @@ zynqmp_dp_aux_readn(struct zynqmp_dp_softc *sc, uint32_t addr,
 	uint32_t reply_code;
 	uint32_t reply_count;
 
-	WR4(sc, ZYNQMP_DP_AUX_ADDRESS, addr);
-	WR4(sc, ZYNQMP_DP_AUX_COMMAND, ZYNQMP_DP_AUX_COMMAND_CMD_AUX_RD |
+	WR4_DP(sc, ZYNQMP_DP_AUX_ADDRESS, addr);
+	WR4_DP(sc, ZYNQMP_DP_AUX_COMMAND, ZYNQMP_DP_AUX_COMMAND_CMD_AUX_RD |
 	    (n - 1));
 
 	tries = 1000;
 	while (--tries > 0) {
-		reply_stat = RD4(sc, ZYNQMP_DP_REPLY_STATUS);
+		reply_stat = RD4_DP(sc, ZYNQMP_DP_REPLY_STATUS);
 		if ((reply_stat &
 		     (ZYNQMP_DP_REPLY_STATUS_REPLY_ERROR |
 		      ZYNQMP_DP_REPLY_STATUS_REPLY_RECEIVED)) != 0)
@@ -631,7 +616,7 @@ zynqmp_dp_aux_readn(struct zynqmp_dp_softc *sc, uint32_t addr,
 		DELAY(10);
 	}
 
-	reply_code = RD4(sc, ZYNQMP_DP_AUX_REPLY_CODE) &
+	reply_code = RD4_DP(sc, ZYNQMP_DP_AUX_REPLY_CODE) &
 		ZYNQMP_DP_AUX_REPLY_CODE_CODE0_MASK;
 	if (reply_code != AUX_NATIVE_REPLY_ACK) {
 		device_printf(sc->dev, "aux read bad reply: 0x%02x.\n",
@@ -644,7 +629,7 @@ zynqmp_dp_aux_readn(struct zynqmp_dp_softc *sc, uint32_t addr,
 		return (-1);
 	}
 
-	reply_count = RD4(sc, ZYNQMP_DP_REPLY_DATA_COUNT) &
+	reply_count = RD4_DP(sc, ZYNQMP_DP_REPLY_DATA_COUNT) &
 		ZYNQMP_DP_REPLY_DATA_COUNT_MASK;
 	if (reply_count != n ) {
 		device_printf(sc->dev, "aux read replied %d bytes not %d\n",
@@ -653,7 +638,7 @@ zynqmp_dp_aux_readn(struct zynqmp_dp_softc *sc, uint32_t addr,
 	}
 
 	for (i = 0; i < n; i++)
-		data[i] = RD4(sc, ZYNQMP_DP_AUX_REPLY_DATA);
+		data[i] = RD4_DP(sc, ZYNQMP_DP_AUX_REPLY_DATA);
 
 	return (0);
 }
@@ -680,15 +665,15 @@ zynqmp_dp_aux_writen(struct zynqmp_dp_softc *sc, uint32_t addr,
 	uint32_t reply_stat;
 	uint32_t reply_code;
 
-	WR4(sc, ZYNQMP_DP_AUX_ADDRESS, addr);
+	WR4_DP(sc, ZYNQMP_DP_AUX_ADDRESS, addr);
 	for (i = 0; i < n; i++)
-		WR4(sc, ZYNQMP_DP_AUX_WRITE_FIFO, data[i]);
-	WR4(sc, ZYNQMP_DP_AUX_COMMAND, ZYNQMP_DP_AUX_COMMAND_CMD_AUX_WR |
+		WR4_DP(sc, ZYNQMP_DP_AUX_WRITE_FIFO, data[i]);
+	WR4_DP(sc, ZYNQMP_DP_AUX_COMMAND, ZYNQMP_DP_AUX_COMMAND_CMD_AUX_WR |
 	    (n - 1));
 
 	tries = 1000;
 	while (--tries > 0) {
-		reply_stat = RD4(sc, ZYNQMP_DP_REPLY_STATUS);
+		reply_stat = RD4_DP(sc, ZYNQMP_DP_REPLY_STATUS);
 		if ((reply_stat &
 		     (ZYNQMP_DP_REPLY_STATUS_REPLY_ERROR |
 		      ZYNQMP_DP_REPLY_STATUS_REPLY_RECEIVED)) != 0)
@@ -696,7 +681,7 @@ zynqmp_dp_aux_writen(struct zynqmp_dp_softc *sc, uint32_t addr,
 		DELAY(10);
 	}
 
-	reply_code = RD4(sc, ZYNQMP_DP_AUX_REPLY_CODE) &
+	reply_code = RD4_DP(sc, ZYNQMP_DP_AUX_REPLY_CODE) &
 	    ZYNQMP_DP_AUX_REPLY_CODE_CODE0_MASK;
 	if (reply_code != AUX_NATIVE_REPLY_ACK) {
 		device_printf(sc->dev, "aux write bad reply: 0x%02x.\n",
@@ -744,62 +729,65 @@ zynqmp_dp_start_stream(struct zynqmp_dp_softc *sc)
 	const int xfer_unit = 64; /* XXX:not sure will ever be configurable. */
 
 	/* Set up main stream. */
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_HTOTAL, sc->width + sc->h_front_porch +
-	    sc->h_sync + sc->h_back_porch);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_HSWIDTH, sc->h_sync);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_HSTART, sc->h_sync + sc->h_back_porch);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_HRES, sc->width);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_VTOTAL, sc->height + sc->v_front_porch +
-	    sc->v_sync + sc->v_back_porch);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_VSWIDTH, sc->v_sync);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_VSTART, sc->v_sync + sc->v_back_porch);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_VRES, sc->height);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_POLARITY,
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_HTOTAL, sc->width +
+	    sc->h_front_porch + sc->h_sync + sc->h_back_porch);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_HSWIDTH, sc->h_sync);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_HSTART, sc->h_sync +
+	    sc->h_back_porch);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_HRES, sc->width);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_VTOTAL, sc->height +
+	    sc->v_front_porch + sc->v_sync + sc->v_back_porch);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_VSWIDTH, sc->v_sync);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_VSTART, sc->v_sync +
+	    sc->v_back_porch);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_VRES, sc->height);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_POLARITY,
 	    ZYNQMP_DP_MAIN_STREAM_POLARITY_HSYNC |
 	    ZYNQMP_DP_MAIN_STREAM_POLARITY_VSYNC);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_MISC0,
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_MISC0,
 	    ZYNQMP_DP_MAIN_STREAM_MISC0_COMP_FORMAT_RGB |
 	    ZYNQMP_DP_MAIN_STREAM_MISC0_BPC_8);
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_MISC1, 0);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_MISC1, 0);
 
 	words_per_lane = (sc->width * sc->bits_per_pixel + 15) / 16;
 	words_per_lane -= sc->lane_ct;
 	words_per_lane += words_per_lane % sc->lane_ct;
-	WR4(sc, ZYNQMP_DP_USER_DATA_COUNT_PER_LANE, words_per_lane);
+	WR4_DP(sc, ZYNQMP_DP_USER_DATA_COUNT_PER_LANE, words_per_lane);
 
-	/* WR4(sc, ZYNQMP_DP_MSA_TRANSFER_UNIT_SIZE, xfer_unit); */
+	/* WR4_DP(sc, ZYNQMP_DP_MSA_TRANSFER_UNIT_SIZE, xfer_unit); */
 	/* Calculate average bytes per TU times 1000. */
 	avg_bytes_tu = (sc->pixclk_khz * xfer_unit * sc->bits_per_pixel / 8) /
 	    (sc->link_bw * 27 * sc->lane_ct);
-	WR4(sc, ZYNQMP_DP_FRAC_BYTES_PER_TU, avg_bytes_tu % 1000);
+	WR4_DP(sc, ZYNQMP_DP_FRAC_BYTES_PER_TU, avg_bytes_tu % 1000);
 	avg_bytes_tu /= 1000;
-	WR4(sc, ZYNQMP_DP_MIN_BYTES_PER_TU, avg_bytes_tu);
+	WR4_DP(sc, ZYNQMP_DP_MIN_BYTES_PER_TU, avg_bytes_tu);
 	if (avg_bytes_tu > xfer_unit)
 		init_wait = 0;
 	else if (avg_bytes_tu < 4)
 		init_wait = xfer_unit;
 	else
 		init_wait = xfer_unit - avg_bytes_tu;
-	WR4(sc, ZYNQMP_DP_INIT_WAIT, init_wait);
+	WR4_DP(sc, ZYNQMP_DP_INIT_WAIT, init_wait);
 
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_ENABLE, 1);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_ENABLE, 1);
 
 	/* Video blender (send layer 1 (graphics) directly). */
-	WR4(sc, ZYNQMP_V_BLEND_LAYER0_CONTROL, 0);
-	WR4(sc, ZYNQMP_V_BLEND_LAYER1_CONTROL,
+	WR4_VB(sc, ZYNQMP_V_BLEND_LAYER0_CONTROL, 0);
+	WR4_VB(sc, ZYNQMP_V_BLEND_LAYER1_CONTROL,
 	    ZYNQMP_V_BLEND_LAYER_CONTROL_BYPASS |
 	    ZYNQMP_V_BLEND_LAYER_CONTROL_RGB_MODE);
 
 	/* Set up AV buffer manager. */
-	WR4(sc, ZYNQMP_AV_BUF_FORMAT, ZYNQMP_AV_BUF_FORMAT_NL_GRAPHX_BGR888);
-	WR4(sc, ZYNQMP_AV_BUF_AUD_VID_CLK_SRC,
+	WR4_AV(sc, ZYNQMP_AV_BUF_FORMAT,
+	    ZYNQMP_AV_BUF_FORMAT_NL_GRAPHX_BGR888);
+	WR4_AV(sc, ZYNQMP_AV_BUF_AUD_VID_CLK_SRC,
 	    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_VID_TIMING_PS |
 	    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_AUD_CLK_PS |
 	    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_VID_CLK_PS);
-	WR4(sc, ZYNQMP_AV_CHBUF(3), ZYNQMP_AV_CHBUF_FLUSH);
-	WR4(sc, ZYNQMP_AV_CHBUF(3), ZYNQMP_AV_CHBUF_BURST_LEN(15) |
-	    ZYNQMP_AV_CHBUF_EN);
-	WR4(sc, ZYNQMP_AV_BUF_OUT_SEL,
+	WR4_AV(sc, ZYNQMP_AV_CHBUF(sc->dpdma_chan), ZYNQMP_AV_CHBUF_FLUSH);
+	WR4_AV(sc, ZYNQMP_AV_CHBUF(sc->dpdma_chan),
+	    ZYNQMP_AV_CHBUF_BURST_LEN(15) | ZYNQMP_AV_CHBUF_EN);
+	WR4_AV(sc, ZYNQMP_AV_BUF_OUT_SEL,
 	    ZYNQMP_AV_BUF_OUT_SEL_VID_ST2_ENABLE_MEM);
 }
 
@@ -815,7 +803,7 @@ zynqmp_dp_wait_phy_ready(struct zynqmp_dp_softc *sc)
 	 */
 	tries = 100;
 	while (tries-- > 0) {
-		if (((val = RD4(sc, ZYNQMP_DP_PHY_STATUS)) &
+		if (((val = RD4_DP(sc, ZYNQMP_DP_PHY_STATUS)) &
 			ZYNQMP_DP_PHY_STATUS_ALL_READY) ==
 		    ZYNQMP_DP_PHY_STATUS_ALL_READY)
 			break;
@@ -830,19 +818,19 @@ zynqmp_dp_set_bw(struct zynqmp_dp_softc *sc)
 {
 
 	/* Disable transmitter. */
-	WR4(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 0);
+	WR4_DP(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 0);
 
 	switch (sc->link_bw) {
 	case DP_LINK_BW_5_4:
-		WR4(sc, ZYNQMP_DP_PHY_CLOCK_SELECT,
+		WR4_DP(sc, ZYNQMP_DP_PHY_CLOCK_SELECT,
 		    ZYNQMP_DP_PHY_CLOCK_SELECT_5_4GBPS);
 		break;
 	case DP_LINK_BW_2_7:
-		WR4(sc, ZYNQMP_DP_PHY_CLOCK_SELECT,
+		WR4_DP(sc, ZYNQMP_DP_PHY_CLOCK_SELECT,
 		    ZYNQMP_DP_PHY_CLOCK_SELECT_2_7GBPS);
 		break;
 	case DP_LINK_BW_1_62:
-		WR4(sc, ZYNQMP_DP_PHY_CLOCK_SELECT,
+		WR4_DP(sc, ZYNQMP_DP_PHY_CLOCK_SELECT,
 		    ZYNQMP_DP_PHY_CLOCK_SELECT_1_62GBPS);
 		break;
 	default:
@@ -850,7 +838,7 @@ zynqmp_dp_set_bw(struct zynqmp_dp_softc *sc)
 		    sc->link_bw);
 		return (-1);
 	}
-	WR4(sc, ZYNQMP_DP_LINK_BW_SET, sc->link_bw);
+	WR4_DP(sc, ZYNQMP_DP_LINK_BW_SET, sc->link_bw);
 
 	/* Wait for PHY ready. */
 	if (zynqmp_dp_wait_phy_ready(sc)) {
@@ -859,7 +847,7 @@ zynqmp_dp_set_bw(struct zynqmp_dp_softc *sc)
 	}
 
 	/* Enable transmitter. */
-	WR4(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 1);
+	WR4_DP(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 1);
 
 	if (zynqmp_dp_aux_write(sc, DP_LINK_BW_SET, sc->link_bw) < 0)
 		return (-2);
@@ -902,7 +890,7 @@ zynqmp_dp_train_set(struct zynqmp_dp_softc *sc, int p_level, int v_level)
 		    p_level, v_level);
 		zynqmp_phy_override_deemph(sc->phydev[i], sc->phyidx[i],
 		    p_level, v_level);
-		WR4(sc, ZYNQMP_DP_SUB_TX_PHY_PRECURSOR_LANE(i), 2);
+		WR4_DP(sc, ZYNQMP_DP_SUB_TX_PHY_PRECURSOR_LANE(i), 2);
 	}
 
 	/* Write training sets. */
@@ -972,8 +960,8 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 	uint8_t linkstat[6];
 
 	/* Training pattern 1. */
-	WR4(sc, ZYNQMP_DP_SCRAMBLING_DISABLE, 1);
-	WR4(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 1);
+	WR4_DP(sc, ZYNQMP_DP_SCRAMBLING_DISABLE, 1);
+	WR4_DP(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 1);
 	if (zynqmp_dp_aux_write(sc, DP_TRAINING_PATTERN_SET,
 		DP_TRAINING_PATTERN_1 | DP_LINK_SCRAMBLING_DISABLE))
 		return (-1);
@@ -1033,7 +1021,7 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 	}
 
 	/* Training pattern 2. */
-	WR4(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 2);
+	WR4_DP(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 2);
 	if (zynqmp_dp_aux_write(sc, DP_TRAINING_PATTERN_SET,
 		DP_TRAINING_PATTERN_2 | DP_LINK_SCRAMBLING_DISABLE) < 0) {
 		error = -2;
@@ -1080,8 +1068,8 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 fail:
 	if (zynqmp_dp_aux_write(sc, DP_TRAINING_PATTERN_SET, 0) < 0)
 		error = -2;
-	WR4(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 0);
-	WR4(sc, ZYNQMP_DP_SCRAMBLING_DISABLE, 0);
+	WR4_DP(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 0);
+	WR4_DP(sc, ZYNQMP_DP_SCRAMBLING_DISABLE, 0);
 
 	return (error);
 }
@@ -1106,14 +1094,14 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 	    sc->dpcd_caps[DP_MAX_LANE_COUNT] & DP_MAX_LANE_COUNT_MASK);
 
 	/* Set lane count and optional enhanced framing. */
-	WR4(sc, ZYNQMP_DP_LANE_COUNT_SET, sc->lane_ct);
+	WR4_DP(sc, ZYNQMP_DP_LANE_COUNT_SET, sc->lane_ct);
 	if (sc->dpcd_caps[DP_MAX_LANE_COUNT] & DP_ENHANCED_FRAME_CAP) {
-		WR4(sc, ZYNQMP_DP_ENHANCED_FRAME_EN, 1);
+		WR4_DP(sc, ZYNQMP_DP_ENHANCED_FRAME_EN, 1);
 		if (zynqmp_dp_aux_write(sc, DP_LANE_COUNT_SET,
 			sc->lane_ct | DP_LANE_COUNT_ENHANCED_FRAME_EN) < 0)
 			return;
 	} else {
-		WR4(sc, ZYNQMP_DP_ENHANCED_FRAME_EN, 0);
+		WR4_DP(sc, ZYNQMP_DP_ENHANCED_FRAME_EN, 0);
 		if (zynqmp_dp_aux_write(sc, DP_LANE_COUNT_SET,
 		    sc->lane_ct) < 0)
 			return;
@@ -1124,12 +1112,12 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 		if (zynqmp_dp_aux_write(sc, DP_DOWNSPREAD_CTRL,
 			DP_SPREAD_AMP_0_5) < 0)
 			return;
-		WR4(sc, ZYNQMP_DP_DOWNSPREAD_CTRL,
+		WR4_DP(sc, ZYNQMP_DP_DOWNSPREAD_CTRL,
 		    ZYNQMP_DP_DOWNSPREAD_CTRL_5_0);
 	} else {
 		if (zynqmp_dp_aux_write(sc, DP_DOWNSPREAD_CTRL, 0) < 0)
 			return;
-		WR4(sc, ZYNQMP_DP_DOWNSPREAD_CTRL, 0);
+		WR4_DP(sc, ZYNQMP_DP_DOWNSPREAD_CTRL, 0);
 	}
 
 	/* Set 8B/10B encoding. */
@@ -1174,8 +1162,8 @@ zynqmp_dp_hpd_down(struct zynqmp_dp_softc *sc)
 	zynqmp_dpdma_stop(sc->dpdma_dev, sc->dpdma_chan);
 
 	/* Stop stream. */
-	WR4(sc, ZYNQMP_DP_MAIN_STREAM_ENABLE, 0);
-	WR4(sc, ZYNQMP_AV_CHBUF(3), 0);
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_ENABLE, 0);
+	WR4_AV(sc, ZYNQMP_AV_CHBUF(sc->dpdma_chan), 0);
 
 	sc->hpd_state = 0;
 }
@@ -1187,19 +1175,19 @@ zynqmp_dp_init_hw(struct zynqmp_dp_softc *sc)
 	ZYNQMP_DP_ASSERT_LOCKED(sc);
 
 	/* Disable interrupts. */
-	WR4(sc, ZYNQMP_DP_INT_DS, ZYNQMP_DP_INT_ALL);
+	WR4_DP(sc, ZYNQMP_DP_INT_DS, ZYNQMP_DP_INT_ALL);
 
 	/* Reset PHY, disable transmitter. */
-	WR4(sc, ZYNQMP_DP_PHY_RESET, ZYNQMP_DP_PHY_RESET_ALL);
-	WR4(sc, ZYNQMP_DP_FORCE_SCRAMBLER_RESET, 1);
-	WR4(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 0);
+	WR4_DP(sc, ZYNQMP_DP_PHY_RESET, ZYNQMP_DP_PHY_RESET_ALL);
+	WR4_DP(sc, ZYNQMP_DP_FORCE_SCRAMBLER_RESET, 1);
+	WR4_DP(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 0);
 
 	/* Set up AUX clock divider. Reference clock is TOPSW_LSBUS_CLK. */
-	WR4(sc, ZYNQMP_DP_AUX_CLOCK_DIVIDER, 100 |
+	WR4_DP(sc, ZYNQMP_DP_AUX_CLOCK_DIVIDER, 100 |
 	    ZYNQMP_DP_AUX_CLOCK_DIV_AUX_PULSE_WIDTH(48));
 
 	/* Clear PHY reset.  Set 8B10B. */
-	WR4(sc, ZYNQMP_DP_PHY_RESET, ZYNQMP_DP_PHY_RESET_EN_8B_10B);
+	WR4_DP(sc, ZYNQMP_DP_PHY_RESET, ZYNQMP_DP_PHY_RESET_EN_8B_10B);
 
 	/* Wait for RESET complete and PLL locked. */
 	if (zynqmp_dp_wait_phy_ready(sc)) {
@@ -1208,10 +1196,10 @@ zynqmp_dp_init_hw(struct zynqmp_dp_softc *sc)
 	}
 
 	/* Enable transmitter. */
-	WR4(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 1);
+	WR4_DP(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 1);
 
 	/* Enable interrupts. */
-	WR4(sc, ZYNQMP_DP_INT_EN, ZYNQMP_DP_INT_STATUS_HPD_EVENT);
+	WR4_DP(sc, ZYNQMP_DP_INT_EN, ZYNQMP_DP_INT_STATUS_HPD_EVENT);
 
 	return (0);
 }
@@ -1224,10 +1212,10 @@ zynqmp_dp_intr(void *arg)
 
 	ZYNQMP_DP_LOCK(sc);
 
-	status = RD4(sc, ZYNQMP_DP_INT_STATUS);
+	status = RD4_DP(sc, ZYNQMP_DP_INT_STATUS);
 	if (status & ZYNQMP_DP_INT_STATUS_HPD_EVENT) {
 		/* Hot-plug event. Detected or lost HPD signal. */
-		if ((RD4(sc, ZYNQMP_DP_INTERRUPT_SIGNAL_STATE) &
+		if ((RD4_DP(sc, ZYNQMP_DP_INTERRUPT_SIGNAL_STATE) &
 		     ZYNQMP_DP_INTERRUPT_SIGNAL_STATE_HPD_STATE) != 0) {
 			if (!sc->hpd_state)
 				zynqmp_dp_hpd_up(sc);
@@ -1241,7 +1229,8 @@ zynqmp_dp_intr(void *arg)
 				    "spurious HPD down int.\n");
 		}
 
-		WR4(sc, ZYNQMP_DP_INT_STATUS, ZYNQMP_DP_INT_STATUS_HPD_EVENT);
+		WR4_DP(sc, ZYNQMP_DP_INT_STATUS,
+		    ZYNQMP_DP_INT_STATUS_HPD_EVENT);
 	}
 
 	ZYNQMP_DP_UNLOCK(sc);
