@@ -59,7 +59,8 @@
 &sdhci0 {
 	status = "okay";
 	no-1-8-v;
-	disable-wp;
+	// disable-wp;
+	wp-inverted;
 };
 
 &xlnx_dpdma {
