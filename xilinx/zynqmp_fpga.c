@@ -65,6 +65,7 @@ __FBSDID("$FreeBSD$");
 
 static struct ofw_compat_data compat_data[] = {
 	{ "xlnx,zynqmp-fpga",		1 },
+	{ "xlnx,zynqmp-pcap-fpga",	1 },
 	{ NULL,				0 },
 };
 

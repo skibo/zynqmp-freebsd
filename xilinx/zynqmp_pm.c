@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <machine/stdarg.h>
 
+#include <dev/fdt/simplebus.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
@@ -137,6 +138,7 @@ __FBSDID("$FreeBSD$");
 #define ZPM_LOCK_DESTROY(_sc)	mtx_destroy(&_sc->sc_mtx);
 
 struct zynqmp_pm_softc {
+	struct simplebus_softc simplebus_sc;
 	device_t	dev;
 	struct mtx	sc_mtx;
 	bool		pm_fw_use_hvc;
@@ -728,7 +730,14 @@ zynqmp_pm_attach(device_t dev)
 
 	zynqmp_pm_getsysctls(sc);
 
-	return (0);
+	/* Allow devices to identify. */
+	bus_generic_probe(dev);
+
+	/* Now walk the OFW tree and attach sub-nodes. */
+	for (node = OF_child(node); node > 0; node = OF_peer(node))
+		simplebus_add_device(dev, node, 0, NULL, -1, NULL);
+
+	return (bus_generic_attach(dev));
 }
 
 static int
@@ -752,11 +761,9 @@ static device_method_t zynqmp_pm_methods[] = {
 	DEVMETHOD_END
 };
 
-static driver_t zynqmp_pm_driver = {
-	"zynqmp_pm",
-	zynqmp_pm_methods,
-	sizeof(struct zynqmp_pm_softc),
-};
+DEFINE_CLASS_1(zynqmp_pm, zynqmp_pm_driver, zynqmp_pm_methods,
+    sizeof(struct zynqmp_pm_softc), simplebus_driver);
+
 static devclass_t zynqmp_pm_devclass;
 
 EARLY_DRIVER_MODULE(zynqmp_pm, simplebus, zynqmp_pm_driver,
