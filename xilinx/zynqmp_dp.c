@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/vt/vt.h>
 
 #include <arm64/xilinx/zynqmp_phy.h>
+#include <arm64/xilinx/zynqmp_dpdma.h>
 
 #include "fb_if.h"
 
@@ -69,6 +70,12 @@ __FBSDID("$FreeBSD$");
  *
  */
 
+static struct ofw_compat_data compat_data[] = {
+	{"xlnx,zynqmp-dp",		1},
+	{"xlnx,zynqmp-dpsub-1.7",	1},
+	{NULL,				0}
+};
+
 struct dpdma_desc;
 
 #define MAX_LANES		2
@@ -77,7 +84,7 @@ struct dpdma_desc;
 struct zynqmp_dp_softc {
 	device_t		dev;
 	struct mtx		sc_mtx;
-	struct resource		*mem_res[2];
+	struct resource		*mem_res[4];
 	struct resource		*irq_res;
 	void			*intr_hdl;
 
@@ -85,17 +92,15 @@ struct zynqmp_dp_softc {
 	int			phyidx[MAX_LANES];
 	int			phy_ct;
 
+	device_t		dpdma_dev;
+	int			dpdma_chan;
+
 	device_t		fbdev;
 	struct fb_info		info;
 	size_t			fb_size;
 	int			fb_stride;
 	bus_addr_t		fb_paddr;
 	vm_offset_t		fb_vaddr;
-
-	bus_dma_tag_t		desc_dma_tag;
-	bus_dmamap_t		desc_dma_map;
-	struct dpdma_desc	*desc;
-	bus_addr_t		desc_paddr;
 
 	int			hpd_state;
 	uint8_t			dpcd_caps[DPCD_RX_CAP_SIZE];
@@ -347,125 +352,6 @@ struct zynqmp_dp_softc {
 #define    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_AUD_CLK_PS		(1 << 1)
 #define    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_VID_CLK_PS		(1 << 0)
 
-/* Display Port DMA Modules registers. */
-#define ZYNQMP_DPDMA_ISR			0x0004
-#define    ZYNQMP_DPDMA_ISR_VSYNC_INT				(1 << 27)
-#define    ZYNQMP_DPDMA_ISR_AXI_RD_4K_CROSS			(1 << 26)
-#define    ZYNQMP_DPDMA_ISR_WR_DATA_FIFO_FULL			(1 << 25)
-#define    ZYNQMP_DPDMA_ISR_WR_CMD_FIFO_FULL			(1 << 24)
-#define    ZYNQMP_DPDMA_ISR_DSCR_ERR(n)				(1 << 18 + (n))
-#define    ZYNQMP_DPDMA_ISR_DATA_AXI_ERR(n)			(1 << 12 + (n))
-#define    ZYNQMP_DPDMA_ISR_NO_OSTAND_TRAN(n)			(1 << 6 + (n))
-#define    ZYNQMP_DPDMA_ISR_DSCR_DONE(n)			(1 << (n))
-#define	   ZYNQMP_DPDMA_ISR_ALL					0x0fffffff
-#define ZYNQMP_DPDMA_IMR			0x0008
-#define ZYNQMP_DPDMA_IEN			0x000c
-#define ZYNQMP_DPDMA_IDS			0x0010
-#define ZYNQMP_DPDMA_EISR			0x0014
-#define    ZYNQMP_DPDMA_EISR_RD_CMD_FIFO_FULL			(1u << 31)
-#define    ZYNQMP_DPDMA_EISR_DSCR_DONE_ERR(n)			(1 << 25 + (n))
-#define    ZYNQMP_DPDMA_EISR_WR_AXI_ERR(n)			(1 << 19 + (n))
-#define    ZYNQMP_DPDMA_EISR_CRC_ERR(n)				(1 << 13 + (n))
-#define    ZYNQMP_DPDMA_EISR_PRE_ERR(n)				(1 << 7 + (n))
-#define    ZYNQMP_DPDMA_EISR_RD_AXI_ERR(n)			(1 << 1 + (n))
-#define    ZYNQMP_DPDMA_EISR_INV_APB				(1 << 0)
-#define ZYNQMP_DPDMA_EIMR			0x0018
-#define ZYNQMP_DPDMA_EIEN			0x001c
-#define ZYNQMP_DPDMA_EIDS			0x0020
-#define ZYNQMP_DPDMA_GBL			0x0104
-#define    ZYNQMP_DPDMA_GBL_RTRG(n)				(1 << 6 + (n))
-#define    ZYNQMP_DPDMA_GBL_TRG(n)				(1 << (n))
-#define ZYNQMP_DPDMA_ALC_CNTL(n)		(0x0108 + 0x18 * (n))
-#define    ZYNQMP_DPDMA_ALC_CNTL_MON_ID				(0xf << 2)
-#define    ZYNQMP_DPDMA_ALC_CNTL_CLEAR				(1 << 1)
-#define    ZYNQMP_DPDMA_ALC_CNTL_EN				(1 << 0)
-#define ZYNQMP_DPDMA_ALC_STATUS(n)		(0x010c + 0x18 * (n))
-#define    ZYNQMP_DPDMA_ALC_STATUS_OFLOW			(1 << 0)
-#define ZYNQMP_DPDMA_ALC_MAX(n)			(0x0110 + 0x18 * (n))
-#define ZYNQMP_DPDMA_ALC_MIN(n)			(0x0114 + 0x18 * (n))
-#define ZYNQMP_DPDMA_ALC_ACC(n)			(0x0118 + 0x18 * (n))
-#define ZYNQMP_DPDMA_ALC_ACC_TRAN(n)		(0x011c + 0x18 * (n))
-#define ZYNQMP_DPDMA_CH_DSCR_STRT_ADDRE(n)	(0x0200 + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_DSCR_STRT_ADDR(n)	(0x0204 + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_DSCR_NEXT_ADDRE(n)	(0x0208 + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_DSCR_NEXT_ADDR(n)	(0x020c + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_PYLD_CUR_ADDRE(n)	(0x0210 + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_PYLD_CUR_ADDR(n)	(0x0214 + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_CNTL(n)			(0x0218 + 0x100 * (n))
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_DLY_CNT_MASK		(0x3ff << 20)
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_DLY_CNT_SHIFT		20
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_DLY_CNT(n)			((n) << 20)
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_AXCACHE_MASK		(0xf << 16)
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_AXCACHE_SHIFT		16
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_AXCACHE(n)			((n) << 16)
-#define    ZYNQMP_DPDMA_CH_CNTL_AXPROT_MASK			(3 << 14)
-#define    ZYNQMP_DPDMA_CH_CNTL_AXPROT_SHIFT			14
-#define    ZYNQMP_DPDMA_CH_CNTL_AXPROT(n)			((n) << 14)
-#define    ZYNQMP_DPDMA_CH_CNTL_DATA_RD_MASK			(0xf << 10)
-#define    ZYNQMP_DPDMA_CH_CNTL_DATA_RD_SHIFT			10
-#define    ZYNQMP_DPDMA_CH_CNTL_DATA_RD(n)			((n) << 10)
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_RD_MASK			(0xf << 6)
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_RD_SHIFT			6
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_RD(n)			((n) << 6)
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_WR_MASK			(0xf << 2)
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_WR_SHIFT			2
-#define    ZYNQMP_DPDMA_CH_CNTL_DSCR_WR(n)			((n) << 2)
-#define    ZYNQMP_DPDMA_CH_CNTL_PAUSE				(1 << 1)
-#define    ZYNQMP_DPDMA_CH_CNTL_EN				(1 << 0)
-#define ZYNQMP_DPDMA_CH_STATUS(n)		(0x021c + 0x100 * (n))
-#define    ZYNQMP_DPDMA_CH_STATUS_OTRAN_CNT_MASK		(0xf << 21)
-#define    ZYNQMP_DPDMA_CH_STATUS_OTRAN_CNT_SHIFT		21
-#define    ZYNQMP_DPDMA_CH_STATUS_PREAMBLE_MASK			(0xff << 13)
-#define    ZYNQMP_DPDMA_CH_STATUS_PREAMBLE_SHIFT		13
-#define    ZYNQMP_DPDMA_CH_STATUS_EN_DSCR_INTR			(1 << 12)
-#define    ZYNQMP_DPDMA_CH_STATUS_EN_DSCR_UP			(1 << 11)
-#define    ZYNQMP_DPDMA_CH_STATUS_DSCR_DONE			(1 << 10)
-#define    ZYNQMP_DPDMA_CH_STATUS_IGNR_DONE			(1 << 9)
-#define    ZYNQMP_DPDMA_CH_STATUS_LDSCR_FRAME			(1 << 8)
-#define    ZYNQMP_DPDMA_CH_STATUS_LAST_DSCR			(1 << 7)
-#define    ZYNQMP_DPDMA_CH_STATUS_EN_CRC			(1 << 6)
-#define    ZYNQMP_DPDMA_CH_STATUS_MODE				(1 << 5)
-#define    ZYNQMP_DPDMA_CH_STATUS_BURST_TYPE			(1 << 4)
-#define    ZYNQMP_DPDMA_CH_STATUS_BURST_LEN_MASK		(0xf << 0)
-#define    ZYNQMP_DPDMA_CH_STATUS_BURST_LEN_SHIFT		0
-#define ZYNQMP_DPDMA_CH_VDO(n)			(0x0220 + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_PYLD_SZ(n)		(0x0224 + 0x100 * (n))
-#define ZYNQMP_DPDMA_CH_DESC_ID(n)		(0x0228 + 0x100 * (n))
-
-struct dpdma_desc {
-	uint32_t	ctrl;
-#define ZYNQMP_DPDMA_DESC_CTRL_PREAMBLE				0xa5
-#define ZYNQMP_DPDMA_DESC_CTRL_COMPL_INT			(1 << 8)
-#define ZYNQMP_DPDMA_DESC_CTRL_DESC_UPDATE			(1 << 9)
-#define ZYNQMP_DPDMA_DESC_CTRL_IGNORE_DONE			(1 << 10)
-#define ZYNQMP_DPDMA_DESC_CTRL_AXI_FIXED_BURST			(1 << 11)
-#define ZYNQMP_DPDMA_DESC_CTRL_AXCACHE_MASK			(0xf << 12)
-#define ZYNQMP_DPDMA_DESC_CTRL_AXCACHE_SHIFT			12
-#define ZYNQMP_DPDMA_DESC_CTRL_AXCACHE(n)			((n) << 12)
-#define ZYNQMP_DPDMA_DESC_CTRL_AXPROT_MASK			(3 << 16)
-#define ZYNQMP_DPDMA_DESC_CTRL_AXPROT_SHIFT			16
-#define ZYNQMP_DPDMA_DESC_CTRL_AXPROT(n)			((n) << 16)
-#define ZYNQMP_DPDMA_DESC_CTRL_MODE_FRAG			(1 << 18)
-#define ZYNQMP_DPDMA_DESC_CTRL_LAST_DESC			(1 << 19)
-#define ZYNQMP_DPDMA_DESC_CTRL_CRC_EN				(1 << 20)
-#define ZYNQMP_DPDMA_DESC_CTRL_LAST_DESC_FRAME			(1 << 21)
-	uint32_t	dscr_id;
-	uint32_t	xfer_size;
-	uint32_t	line_size_stride;
-#define ZYNQMP_DPDMA_DESC_STRIDE(n)				((n) << 18)
-	uint32_t	timestamp_lo;
-	uint32_t	timestamp_hi;
-	uint32_t	addr_ext;	/* src in hi 16 bits, next in lo */
-	uint32_t	next_desc;
-	uint32_t	src_addr;
-	uint32_t	addr_ext_23;
-	uint32_t	addr_ext_45;
-	uint32_t	src_addr_2;
-	uint32_t	src_addr_3;
-	uint32_t	src_addr_4;
-	uint32_t	src_addr_5;
-	uint32_t	crc;
-};
 
 /* Defines for DP specification.  (incomplete.) */
 #define AUX_NATIVE_REPLY_ACK			(0 << 4)
@@ -552,20 +438,32 @@ struct dpdma_desc {
 	mtx_init(&(sc)->sc_mtx, device_get_nameunit((sc)->dev), "fb", MTX_DEF)
 #define ZYNQMP_DP_LOCK_DESTROY(sc)	mtx_destroy(&(sc)->sc_mtx)
 
-#define RD4(sc, off)		(bus_read_4((sc)->mem_res[0], (off)))
-#define WR4(sc, off, val)	(bus_write_4((sc)->mem_res[0], (off), (val)))
-#define RD4DMA(sc, off)		(bus_read_4((sc)->mem_res[1], (off)))
-#define WR4DMA(sc, off, val)	(bus_write_4((sc)->mem_res[1], (off), (val)))
-
-static struct ofw_compat_data compat_data[] = {
-	{"xlnx,zynqmp-dp",		1},
-	{"xlnx,zynqmp-dpsub-1.7",	1},
-	{NULL,				0}
-};
-
 static int zynqmp_dp_attach(device_t);
 static int zynqmp_dp_detach(device_t);
 
+
+/* XXX: ugly but for now... */
+inline uint32_t
+RD4(struct zynqmp_dp_softc *sc, uint32_t off)
+{
+	int i = 0;
+	if ((off >> 12) != 0) {
+		i = (off >> 12) - 9;
+		off &= 0xfff;
+	}
+	return bus_read_4(sc->mem_res[i], off);
+}
+
+inline void
+WR4(struct zynqmp_dp_softc *sc, uint32_t off, uint32_t val)
+{
+	int i = 0;
+	if ((off >> 12) != 0) {
+		i = (off >> 12) - 9;
+		off &= 0xfff;
+	}
+	bus_write_4(sc->mem_res[i], off, val);
+}
 
 static int
 zynqmp_dp_setup_fbd(struct zynqmp_dp_softc *sc)
@@ -647,18 +545,6 @@ zynqmp_dp_dump(SYSCTL_HANDLER_ARGS)
 	    RD4(sc, ZYNQMP_DP_PHY_STATUS));
 	printf("  ZYNQMP_DP_INT_STATUS:\t\t0x%08x\n",
 	    RD4(sc, ZYNQMP_DP_INT_STATUS));
-
-	printf("  DPDMA_ISR:\t\t\t0x%08x\n", RD4DMA(sc, ZYNQMP_DPDMA_ISR));
-	for (i = 0; i < 6; i++) {
-		printf("  DPDMA_CH_STATUS(%d):\t\t0x%08x\n", i,
-		    RD4DMA(sc, ZYNQMP_DPDMA_CH_STATUS(i)));
-		printf("  DPDMA_CH_DSCR_STRT_ADDR(%d):\t0x%08x\n", i,
-		    RD4DMA(sc, ZYNQMP_DPDMA_CH_DSCR_STRT_ADDR(i)));
-		printf("  DPDMA_CH_DSCR_NEXT_ADDR(%d):\t0x%08x\n", i,
-		    RD4DMA(sc, ZYNQMP_DPDMA_CH_DSCR_NEXT_ADDR(i)));
-		printf("  DPDMA_CH_PYLD_CUR_ADDR(%d):\t0x%08x\n", i,
-		    RD4DMA(sc, ZYNQMP_DPDMA_CH_PYLD_CUR_ADDR(i)));
-	}
 
 	printf("Dumping receiver settings:\n");
 	zynqmp_dp_dump_settings(sc);
@@ -847,51 +733,6 @@ zynqmp_dp_dump_settings(struct zynqmp_dp_softc *sc)
 		printf("%s: trouble reading aux2\n", __func__);
 	for (i = 0; i < 3; i++)
 		printf("\taux[0x%x] = %02x\n", 0x202 + i, data[i]);
-}
-
-static void
-callback_getaddr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
-{
-
-	if (nsegs != 1 || error)
-		return;
-	*(bus_addr_t *)arg = segs[0].ds_addr;
-}
-
-static void
-zynqmp_dpdma_start(struct zynqmp_dp_softc *sc)
-{
-
-	/*
-	 * Create a descriptor that points to frame buffer memory and
-	 * whose next descriptor field points at itself.
-	 */
-	memset(sc->desc, 0, sizeof(struct dpdma_desc));
-	sc->desc->ctrl =
-	    ZYNQMP_DPDMA_DESC_CTRL_PREAMBLE |
-	    ZYNQMP_DPDMA_DESC_CTRL_IGNORE_DONE |
-	    ZYNQMP_DPDMA_DESC_CTRL_LAST_DESC_FRAME;
-	sc->desc->xfer_size = sc->width * sc->height * FB_DEPTH / 8;
-	sc->desc->line_size_stride = (sc->width * FB_DEPTH / 8) |
-	    (sc->fb_stride << 14);
-	sc->desc->src_addr = sc->fb_paddr & 0xffffffffu;
-	sc->desc->next_desc = sc->desc_paddr & 0xffffffffu;
-	sc->desc->addr_ext = (sc->fb_paddr >> 16 & 0xffff0000u) |
-	    (sc->desc_paddr >> 32);
-
-	bus_dmamap_sync(sc->desc_dma_tag, sc->desc_dma_map,
-			BUS_DMASYNC_PREWRITE);
-
-	/* Give it the descriptor physical address and GO. */
-	WR4DMA(sc, ZYNQMP_DPDMA_CH_DSCR_STRT_ADDRE(3), sc->desc_paddr >> 32);
-	WR4DMA(sc, ZYNQMP_DPDMA_CH_DSCR_STRT_ADDR(3),
-	    sc->desc_paddr & 0xffffffffu);
-	WR4DMA(sc, ZYNQMP_DPDMA_CH_CNTL(3),
-	    ZYNQMP_DPDMA_CH_CNTL_DSCR_WR(11) |
-	    ZYNQMP_DPDMA_CH_CNTL_DSCR_RD(11) |
-	    ZYNQMP_DPDMA_CH_CNTL_DATA_RD(11) |
-	    ZYNQMP_DPDMA_CH_CNTL_EN);
-	WR4DMA(sc, ZYNQMP_DPDMA_GBL, ZYNQMP_DPDMA_GBL_TRG(3));
 }
 
 static void
@@ -1322,16 +1163,15 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 	}
 
 	zynqmp_dp_start_stream(sc);
-	zynqmp_dpdma_start(sc);
+	zynqmp_dpdma_start(sc->dpdma_dev, &sc->info, sc->dpdma_chan);
 	sc->hpd_state = 1;
 }
 
 static void
 zynqmp_dp_hpd_down(struct zynqmp_dp_softc *sc)
 {
-
-	/* Stop DPDMA. */
-	WR4DMA(sc, ZYNQMP_DPDMA_CH_CNTL(3), 0);
+	/* Stop DPDMA */
+	zynqmp_dpdma_stop(sc->dpdma_dev, sc->dpdma_chan);
 
 	/* Stop stream. */
 	WR4(sc, ZYNQMP_DP_MAIN_STREAM_ENABLE, 0);
@@ -1348,9 +1188,6 @@ zynqmp_dp_init_hw(struct zynqmp_dp_softc *sc)
 
 	/* Disable interrupts. */
 	WR4(sc, ZYNQMP_DP_INT_DS, ZYNQMP_DP_INT_ALL);
-
-	/* Disable all interrupts in DPDMA. */
-	WR4DMA(sc, ZYNQMP_DPDMA_IDS, ZYNQMP_DPDMA_ISR_ALL);
 
 	/* Reset PHY, disable transmitter. */
 	WR4(sc, ZYNQMP_DP_PHY_RESET, ZYNQMP_DP_PHY_RESET_ALL);
@@ -1457,6 +1294,41 @@ zynqmp_dp_get_phys(struct zynqmp_dp_softc *sc)
 	return (sc->phy_ct == 0 ? ENXIO : 0);
 }
 
+static device_t
+zynqmp_dp_getdpdma(device_t dev, int *pchannel)
+{
+	phandle_t node;
+	phandle_t xref;
+	int error;
+	int ndmas;
+	pcell_t *cells;
+
+	node = ofw_bus_get_node(dev);
+	if (node <= 0) {
+		device_printf(dev, "could not get my node!\n");
+		return (NULL);
+	}
+
+	node = ofw_bus_find_child(node, "gfx-layer");
+	if (node <= 0) {
+		device_printf(dev, "could not find gfx-layer\n");
+		return (NULL);
+	}
+
+	/* Get list of dma xrefs.  We expect only one. */
+	error = ofw_bus_parse_xref_list_alloc(node, "dmas", "#dma-cells", 0,
+	    &xref, &ndmas, &cells);
+	if (error) {
+		device_printf(dev, "could not parse dmas list\n");
+		return (NULL);
+	}
+
+	*pchannel = cells[0];
+
+	OF_prop_free(cells);
+	return (OF_device_from_xref(xref));
+}
+
 static int
 zynqmp_dp_probe(device_t dev)
 {
@@ -1475,6 +1347,7 @@ static int
 zynqmp_dp_attach(device_t dev)
 {
 	struct zynqmp_dp_softc *sc = device_get_softc(dev);
+	int i;
 	int rid;
 	int error;
 
@@ -1482,24 +1355,24 @@ zynqmp_dp_attach(device_t dev)
 
 	ZYNQMP_DP_LOCK_INIT(sc);
 
-	/* DP Module device registers. */
-	rid = 0;
-	sc->mem_res[0] = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
-	    RF_ACTIVE);
-	if (sc->mem_res[0] == NULL) {
-		device_printf(dev, "could not allocate memory resource 0.\n");
-		error = ENOMEM;
-		goto fail;
+	/* Get DPDMA device. */
+	sc->dpdma_dev = zynqmp_dp_getdpdma(dev, &sc->dpdma_chan);
+	if (sc->dpdma_dev == NULL) {
+		device_printf(dev, "could not find dpdma device.\n");
+		return (ENXIO);
 	}
 
-	/* DPDMA Module device registers. */
-	rid = 1;
-	sc->mem_res[1] = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
-	    RF_ACTIVE);
-	if (sc->mem_res[1] == NULL) {
-		device_printf(dev, "could not allocate memory resource 1.\n");
-		error = ENOMEM;
-		goto fail;
+	/* DP Module device registers: DP, V_BLEND, AV_BUF, AUDIO. */
+	for (i = 0; i < 4; i++) {
+		rid = i;
+		sc->mem_res[i] = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		    &rid, RF_ACTIVE);
+		if (sc->mem_res[i] == NULL) {
+			device_printf(dev,
+			    "could not allocate memory resource %d.\n", i);
+			error = ENOMEM;
+			goto fail;
+		}
 	}
 
 	/* Allocate IRQ. */
@@ -1517,31 +1390,6 @@ zynqmp_dp_attach(device_t dev)
 	    NULL, zynqmp_dp_intr, sc, &sc->intr_hdl);
 	if (error) {
 		device_printf(dev, "could not set up interrupt.\n");
-		goto fail;
-	}
-
-	/* Create DMA resources for DPDMA descriptor. */
-	error = bus_dma_tag_create(bus_get_dma_tag(sc->dev), 1, 0,
-	    BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR, NULL, NULL,
-	    sizeof(struct dpdma_desc), 1, sizeof(struct dpdma_desc), 0,
-	    busdma_lock_mutex, &sc->sc_mtx, &sc->desc_dma_tag);
-	if (error) {
-		device_printf(dev, "bus_dma_tag_create failed.\n");
-		goto fail;
-	}
-
-	error = bus_dmamem_alloc(sc->desc_dma_tag,
-	    (void **)&sc->desc, BUS_DMA_NOWAIT, &sc->desc_dma_map);
-	if (error) {
-		device_printf(dev, "bus_dmamem_alloc failed.\n");
-		goto fail;
-	}
-
-	error = bus_dmamap_load(sc->desc_dma_tag, sc->desc_dma_map,
-	    (void *)sc->desc, sizeof(struct dpdma_desc), callback_getaddr,
-	    &sc->desc_paddr, BUS_DMA_NOWAIT);
-	if (error) {
-		device_printf(dev, "bus_dmamap_load failed.\n");
 		goto fail;
 	}
 
@@ -1587,21 +1435,6 @@ zynqmp_dp_detach(device_t dev)
 		sc->irq_res = NULL;
 	}
 
-	/* Unload DMA map and resoures. */
-	if (sc->desc_paddr != 0) {
-		bus_dmamap_unload(sc->desc_dma_tag, sc->desc_dma_map);
-		sc->desc_paddr = 0;
-	}
-	if (sc->desc != NULL) {
-		bus_dmamem_free(sc->desc_dma_tag, sc->desc, sc->desc_dma_map);
-		sc->desc = NULL;
-		sc->desc_dma_map = NULL;
-	}
-	if (sc->desc_dma_tag != NULL) {
-		bus_dma_tag_destroy(sc->desc_dma_tag);
-		sc->desc_dma_tag = NULL;
-	}
-
 	/* Release resources. */
 	if (sc->mem_res[0]) {
 		bus_release_resource(dev, SYS_RES_MEMORY,
@@ -1639,6 +1472,8 @@ static driver_t zynqmp_dp_driver = {
 	sizeof(struct zynqmp_dp_softc)
 };
 
-DRIVER_MODULE(zynqmp_dp, simplebus, zynqmp_dp_driver, zynqmp_dp_devclass, 0, 0);
+DRIVER_MODULE(zynqmp_dp, simplebus, zynqmp_dp_driver, zynqmp_dp_devclass, \
+    0, 0);
 MODULE_DEPEND(zynqmp_dp, zynqmp_phy, 1, 1, 1);
+MODULE_DEPEND(zynqmp_dp, zynqmp_dpdma, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);
