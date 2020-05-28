@@ -62,6 +62,10 @@
 	disable-wp;
 };
 
+&xlnx_dpdma {
+	status = "okay";
+};
+
 &disp0 {
 	status = "okay";
 	phy-names = "dp-phy0", "dp-phy1";
