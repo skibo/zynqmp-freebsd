@@ -1,4 +1,3 @@
-
 Work in progress for FreeBSD on Zynq UltraScale+ (zynqmp).
 ==========================================================
 
@@ -10,32 +9,35 @@ diff/	- patches needed to /usr/src.  At the moment, only sys/conf/files.arm64
 	  needs to include the driver files.
 
 xilinx/	- drivers.  These files belong in sys/arm64/xilinx.
-	
+
 	zynqmp_clk.c	- clock infrastructure driver.
 	zynqmp_dp.c	- Display Port driver.  Only supports 1920x1080.
+	zynqmp_dpdma.c	- Display Port DMA driver.
 	zynqmp_fpga.c	- PL device configuration, allows FPGA programming
 	zynqmp_gpio.c	- GPIO driver
 	zynqmp_phy.c	- SERDES PHY driver, needed by display port driver.
 	zynqmp_phy.h
 	zynqmp_pm.c	- Platform Management driver, talks to both firmware
-	zynqmp_pm.h 	  running at EL3 on ARM and power and clock management
+	zynqmp_pm.h	  running at EL3 on ARM and power and clock management
 			  firmware running on MicroBlaze PMU (Platform
 			  Management Unit).  FPGA and clock drivers depend on
 			  this.
 	zynqmp_rst.c	- Skeleton reset driver.  Does nothing for now.
+	zynqmp_usb.c	- A minimal driver for a few zynq-specific registers
+			  and a container for the dwc3 USB 3.0 driver.
 
-dts/	- device tree sources.  Where I can, I try to closely follow the "GNU"
-	  DTS files in that other operating system.
 
+dts/	- device tree sources.  I am moving towards using "GNU" upstream
+	  DTS files (from https://github.com/xilinx/linux-xlnx) and away
+	  from these.  In these dts sources are some work-arounds to allow
+	  a GENERIC kernel to boot on the Ultra-96.
 
 Also, an update to the if_cgem.c driver to support gigabit ethernet on the
 Zynq UltraScale+ is up for review at https://reviews.freebsd.org/D24304  and
 should land in the source soon.
 
-
 ---
 Thomas Skibo
 ThomasSkibo@yahoo.com
 
-April 2020
-
+May 2020
