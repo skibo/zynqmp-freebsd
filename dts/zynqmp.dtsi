@@ -363,6 +363,8 @@
 				dma-names = "gfx0";
 				dmas = <&xlnx_dpdma 3>;
 			};
+			clock-names = "dp_vtc_pixel_clk_in";
+			clocks = <&zynqmp_clk 16>;
 		};
 	};
 

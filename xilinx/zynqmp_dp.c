@@ -52,6 +52,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <dev/extres/clk/clk.h>
+
 #include <dev/fb/fbreg.h>
 #include <dev/vt/vt.h>
 
@@ -94,6 +96,9 @@ struct zynqmp_dp_softc {
 
 	device_t		dpdma_dev;
 	int			dpdma_chan;
+
+	clk_t			vref_clk;
+	int			vref_clk_freq;
 
 	device_t		fbdev;
 	struct fb_info		info;
@@ -572,6 +577,9 @@ zynqmp_dp_add_sysctls(struct zynqmp_dp_softc *sc)
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_dump",
 	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
 	    sc, 0, zynqmp_dp_dump, "I", "dump displayport regs");
+
+	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "_ref_clk", CTLFLAG_RD,
+	    &sc->vref_clk_freq, 0, "Reference clock frequency");
 
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "h_back_porch", CTLFLAG_RD,
 	    &sc->h_back_porch, 0, "Horizontal back porch in pixels");
@@ -1339,6 +1347,7 @@ zynqmp_dp_attach(device_t dev)
 	int i;
 	int rid;
 	int error;
+	uint64_t freq64;
 
 	sc->dev = dev;
 
@@ -1390,6 +1399,14 @@ zynqmp_dp_attach(device_t dev)
 	error = zynqmp_dp_get_phys(sc);
 	if (error)
 		goto fail;
+
+	/* Retrieve clock even though we cannot change it yet. */
+	error = clk_get_by_ofw_name(dev, 0, "dp_vtc_pixel_clk_in",
+	    &sc->vref_clk);
+	if (error)
+		device_printf(dev, "warning: could not get video ref clock");
+	else if (!clk_get_freq(sc->vref_clk, &freq64))
+		sc->vref_clk_freq = (int)freq64;
 
 	zynqmp_dp_add_sysctls(sc);
 
