@@ -55,6 +55,7 @@ struct zynqmp_usb_softc {
 	struct simplebus_softc	simplebus_sc;
 	device_t		dev;
 	struct resource		*mem_res;
+	phandle_t		phyxref;
 };
 
 #define WR4(sc, off, val)	bus_write_4((sc)->mem_res, (off), (val))
@@ -68,9 +69,24 @@ struct zynqmp_usb_softc {
  *
  */
 #define USB3_CUR_PWR_ST			0x000
+#define     USB3_CUR_PWR_ST_MASK		0xf
+#define     USB3_CUR_PWR_ST_D0			0x0
+#define     USB3_CUR_PWR_ST_D3			0xf
 #define USB3_CONNECT_ST			0x004
+#define USB3_REQ_PWR_ST			0x03c
+#define     USB3_REQ_PWR_ST_D0			0
+#define     USB3_REQ_PWR_ST_D3			3
 #define USB3_COHERENCY			0x05c
 #define     USB3_COHERENCY_EN			1
+
+static void
+zynqmp_usb_init_hw(struct zynqmp_usb_softc *sc)
+{
+
+	/* Route transactions through CCI. */
+	WR4(sc, USB3_COHERENCY, RD4(sc, USB3_COHERENCY) |
+	    USB3_COHERENCY_EN);
+}
 
 static int
 zynqmp_usb_probe(device_t dev)
@@ -93,19 +109,24 @@ zynqmp_usb_attach(device_t dev)
 	struct zynqmp_usb_softc *sc = device_get_softc(dev);
 	int rid;
 	phandle_t node;
+	phandle_t child;
+	int ncells;
+	pcell_t *cells;
+	int error;
 
 	sc->dev = dev;
 
-	/* Check for real dwc3 controller which is this node's child. */
+	/* Check for standard dwc3 controller which is this node's child. */
 	node = ofw_bus_get_node(dev);
-	if (node == -1)
+	if (node <= 0)
 		return (ENXIO);
-	if (OF_child(node) <= 0) {
+	child = OF_child(node);
+	if (child <= 0) {
 		device_printf(dev, "missing child node.\n");
 		return (ENXIO);
 	}
 
-	/* DP Module device registers. */
+	/* Get memory resources. */
 	rid = 0;
 	sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
 	    RF_ACTIVE);
@@ -114,9 +135,15 @@ zynqmp_usb_attach(device_t dev)
 		return (ENOMEM);
 	}
 
-	/* Route transactions through CCI. */
-	WR4(sc, USB3_COHERENCY, RD4(sc, USB3_COHERENCY) |
-	    USB3_COHERENCY_EN);
+	/* Get phy handle. */
+	error = ofw_bus_parse_xref_list_alloc(child, "phys", "#phy-cells", 0,
+	    &sc->phyxref, &ncells, &cells);
+	if (error)
+		device_printf(dev, "could not find phy for device\n");
+	else
+		OF_prop_free(cells);
+
+	zynqmp_usb_init_hw(sc);
 
 	/*
 	 * XXX TODO: certain chip versions have suspend phy quirk.
@@ -128,7 +155,7 @@ zynqmp_usb_attach(device_t dev)
 	bus_generic_probe(dev);
 
 	/* Attach child node, the generic dwc3 driver. */
-	simplebus_add_device(dev, OF_child(node), 0, NULL, -1, NULL);
+	simplebus_add_device(dev, child, 0, NULL, -1, NULL);
 
 	return (bus_generic_attach(dev));
 }
