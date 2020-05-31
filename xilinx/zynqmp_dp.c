@@ -90,8 +90,7 @@ struct zynqmp_dp_softc {
 	struct resource		*irq_res;
 	void			*intr_hdl;
 
-	device_t		phydev[MAX_LANES];
-	int			phyidx[MAX_LANES];
+	phandle_t		phyxref[MAX_LANES];
 	int			phy_ct;
 
 	device_t		dpdma_dev;
@@ -894,10 +893,8 @@ zynqmp_dp_train_set(struct zynqmp_dp_softc *sc, int p_level, int v_level)
 
 	/* Adjust our PHYs */
 	for (i = 0; i < sc->lane_ct; i++) {
-		zynqmp_phy_margining_factor(sc->phydev[i], sc->phyidx[i],
-		    p_level, v_level);
-		zynqmp_phy_override_deemph(sc->phydev[i], sc->phyidx[i],
-		    p_level, v_level);
+		zynqmp_phy_margining_factor(sc->phyxref[i], p_level, v_level);
+		zynqmp_phy_override_deemph(sc->phyxref[i], p_level, v_level);
 		WR4_DP(sc, ZYNQMP_DP_SUB_TX_PHY_PRECURSOR_LANE(i), 2);
 	}
 
@@ -1259,7 +1256,6 @@ zynqmp_dp_get_phys(struct zynqmp_dp_softc *sc)
 	int i;
 	int error;
 	int index;
-	phandle_t xref;
 	pcell_t *cells;
 	int ncells;
 	char name[16];
@@ -1272,17 +1268,9 @@ zynqmp_dp_get_phys(struct zynqmp_dp_softc *sc)
 			break;
 
 		error = ofw_bus_parse_xref_list_alloc(node, "phys",
-		    "#phy-cells", index, &xref, &ncells, &cells);
+		    "#phy-cells", index, &sc->phyxref[i], &ncells, &cells);
 		if (error)
 			break;
-		if (ncells < 2) {
-			device_printf(sc->dev, "need index in phy cell.\n");
-			OF_prop_free(cells);
-			break;
-		}
-
-		sc->phydev[i] = OF_device_from_xref(xref);
-		sc->phyidx[i] = cells[1];
 		OF_prop_free(cells);
 	}
 
@@ -1297,7 +1285,7 @@ zynqmp_dp_getdpdma(device_t dev, int *pchannel)
 	phandle_t node;
 	phandle_t xref;
 	int error;
-	int ndmas;
+	int ncells;
 	pcell_t *cells;
 
 	node = ofw_bus_get_node(dev);
@@ -1314,7 +1302,7 @@ zynqmp_dp_getdpdma(device_t dev, int *pchannel)
 
 	/* Get list of dma xrefs.  We expect only one. */
 	error = ofw_bus_parse_xref_list_alloc(node, "dmas", "#dma-cells", 0,
-	    &xref, &ndmas, &cells);
+	    &xref, &ncells, &cells);
 	if (error) {
 		device_printf(dev, "could not parse dmas list\n");
 		return (NULL);

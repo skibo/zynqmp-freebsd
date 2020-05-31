@@ -128,6 +128,7 @@ struct zynqmp_phy_softc {
 	struct ps_phy {
 		int proto;
 		int ctlr;
+		phandle_t xref;
 	} phy[NUM_PHYS];
 };
 
@@ -220,14 +221,30 @@ zynqmp_phy_add_sysctls(struct zynqmp_phy_softc *sc)
 	}
 }
 
-int
-zynqmp_phy_wait_pll_lock(device_t dev, int phy)
+static int
+zynqmp_phy_lane_from_xref(struct zynqmp_phy_softc *sc, phandle_t xref)
 {
-	struct zynqmp_phy_softc *sc = device_get_softc(dev);
+	int i;
+
+	for (i = 0; i < NUM_PHYS; i++)
+		if (sc->phy[i].xref == xref)
+			return (i);
+	return (-1);
+}
+
+int
+zynqmp_phy_wait_pll_lock(phandle_t xref)
+{
+	device_t dev;
+	struct zynqmp_phy_softc *sc;
+	int phy;
 	int tries = 1000;
 
-	if (!sc)
+	dev = OF_device_from_xref(xref);
+	if (dev == NULL)
 		return (ENXIO);
+	sc = device_get_softc(dev);
+	phy = zynqmp_phy_lane_from_xref(sc, xref);
 
 	ZPHY_LOCK(sc);
 
@@ -243,15 +260,21 @@ zynqmp_phy_wait_pll_lock(device_t dev, int phy)
 }
 
 int
-zynqmp_phy_margining_factor(device_t dev, int phy, int p_level, int v_level)
+zynqmp_phy_margining_factor(phandle_t xref, int p_level, int v_level)
 {
-	struct zynqmp_phy_softc *sc = device_get_softc(dev);
+	device_t dev;
+	struct zynqmp_phy_softc *sc;
+	int phy;
 	static uint8_t vs[4][4] = { { 0x2a, 0x27, 0x24, 0x20 },
 				    { 0x27, 0x23, 0x20, 0xff },
 				    { 0x24, 0x20, 0xff, 0xff },
 				    { 0xff, 0xff, 0xff, 0xff } };
-	if (!sc)
+
+	dev = OF_device_from_xref(xref);
+	if (dev == NULL)
 		return (ENXIO);
+	sc = device_get_softc(dev);
+	phy = zynqmp_phy_lane_from_xref(sc, xref);
 
 	ZPHY_LOCK(sc);
 	WR4(sc, SERDES_TXPMD_TM_48_L(phy), vs[p_level][v_level]);
@@ -261,16 +284,21 @@ zynqmp_phy_margining_factor(device_t dev, int phy, int p_level, int v_level)
 }
 
 int
-zynqmp_phy_override_deemph(device_t dev, int phy, int p_level, int v_level)
+zynqmp_phy_override_deemph(phandle_t xref, int p_level, int v_level)
 {
-	struct zynqmp_phy_softc *sc = device_get_softc(dev);
+	device_t dev;
+	struct zynqmp_phy_softc *sc;
+	int phy;
 	static uint8_t pe[4][4] = { { 0x02, 0x02, 0x02, 0x02 },
 				    { 0x01, 0x01, 0x01, 0xff },
 				    { 0x00, 0x00, 0xff, 0xff },
 				    { 0xff, 0xff, 0xff, 0xff } };
 
-	if (!sc)
+	dev = OF_device_from_xref(xref);
+	if (dev == NULL)
 		return (ENXIO);
+	sc = device_get_softc(dev);
+	phy = zynqmp_phy_lane_from_xref(sc, xref);
 
 	ZPHY_LOCK(sc);
 	WR4(sc, SERDES_TX_ANA_TM_18_L(phy), pe[p_level][v_level]);
@@ -300,6 +328,7 @@ zynqmp_phy_attach(device_t dev)
 	phandle_t node = ofw_bus_get_node(dev);
 	phandle_t child;
 	int rid;
+	int phy;
 
 	sc->dev = dev;
 
@@ -323,10 +352,13 @@ zynqmp_phy_attach(device_t dev)
 		return (ENOMEM);
 	}
 
-	/* Register node and children to this driver. */
+	/* Register node and children (phy lanes) to this driver. */
 	OF_device_register_xref(OF_xref_from_node(node), dev);
-	for (child = OF_child(node); child != 0; child = OF_peer(child))
-		OF_device_register_xref(OF_xref_from_node(child), dev);
+	for (phy = 0, child = OF_child(node); child != 0 && phy < NUM_PHYS;
+	     child = OF_peer(child), phy++) {
+		sc->phy[phy].xref = OF_xref_from_node(child);
+		OF_device_register_xref(sc->phy[phy].xref, dev);
+	}
 
 	zynqmp_phy_read_config(sc);
 

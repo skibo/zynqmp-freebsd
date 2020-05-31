@@ -32,8 +32,8 @@
 #define __ZYNQMP_PHY_H__
 
 #ifdef _KERNEL
-int zynqmp_phy_wait_pll_lock(device_t, int);
-int zynqmp_phy_margining_factor(device_t, int, int, int);
-int zynqmp_phy_override_deemph(device_t, int, int, int);
+int zynqmp_phy_wait_pll_lock(phandle_t);
+int zynqmp_phy_margining_factor(phandle_t, int, int);
+int zynqmp_phy_override_deemph(phandle_t, int, int);
 #endif
 #endif /* __ZYNQMP_PHY_H__ */
