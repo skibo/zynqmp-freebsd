@@ -852,6 +852,7 @@ static int
 zynqmp_clk_attach(device_t dev)
 {
 	struct zynqmp_clk_softc *sc = device_get_softc(dev);
+	phandle_t node = ofw_bus_get_node(dev);
 	int err;
 
 	sc->dev = dev;
@@ -861,6 +862,9 @@ zynqmp_clk_attach(device_t dev)
 		return (err);
 
 	zynqmp_clk_addsysctls(sc);
+
+	/* Register node to this driver. */
+	OF_device_register_xref(OF_xref_from_node(node), dev);
 
 	ZCLK_LOCK_INIT(sc);
 
