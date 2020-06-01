@@ -293,8 +293,8 @@ zynqmp_clk_get_max_divisor(int clock_id, int div_id, uint32_t *max_div)
 static int
 zynqmp_clk_dump(SYSCTL_HANDLER_ARGS)
 {
-	int error, i;
 	struct zynqmp_clk_softc *sc = (struct zynqmp_clk_softc *)arg1;
+	int error, i;
 
 	error = sysctl_wire_old_buffer(req, sizeof(int));
 	if (error == 0) {
@@ -307,6 +307,60 @@ zynqmp_clk_dump(SYSCTL_HANDLER_ARGS)
 	clkdom_dump(sc->clkdom);
 
 	return (0);
+}
+
+/* Totally for debuggin.  Get and set pl0 clock (fpga clock 0). */
+static int
+zynqmp_clk_test_set_pl0(SYSCTL_HANDLER_ARGS)
+{
+	struct zynqmp_clk_softc *sc = (struct zynqmp_clk_softc *)arg1;
+	int error, freq;
+	uint64_t freq64;
+
+	error = sysctl_wire_old_buffer(req, sizeof(int));
+	if (error == 0) {
+		clkdom_xlock(sc->clkdom);
+		(void)clknode_get_freq(sc->clknodes[71], &freq64);
+		clkdom_unlock(sc->clkdom);
+		freq = (int)freq64;
+		error = sysctl_handle_int(oidp, &freq, 0, req);
+	}
+	if (error || req->newptr == NULL)
+		return (error);
+
+	freq64 = freq;
+	clkdom_xlock(sc->clkdom);
+	error = clknode_set_freq(sc->clknodes[71], freq64, 0, 0);
+	clkdom_unlock(sc->clkdom);
+
+	return (error);
+}
+
+/* Totally for debuggin.  Get and set dp video ref clock. */
+static int
+zynqmp_clk_test_set_vid(SYSCTL_HANDLER_ARGS)
+{
+	struct zynqmp_clk_softc *sc = (struct zynqmp_clk_softc *)arg1;
+	int error, freq;
+	uint64_t freq64;
+
+	error = sysctl_wire_old_buffer(req, sizeof(int));
+	if (error == 0) {
+		clkdom_xlock(sc->clkdom);
+		(void)clknode_get_freq(sc->clknodes[16], &freq64);
+		clkdom_unlock(sc->clkdom);
+		freq = (int)freq64;
+		error = sysctl_handle_int(oidp, &freq, 0, req);
+	}
+	if (error || req->newptr == NULL)
+		return (error);
+
+	freq64 = freq;
+	clkdom_xlock(sc->clkdom);
+	error = clknode_set_freq(sc->clknodes[16], freq64, 0, 0);
+	clkdom_unlock(sc->clkdom);
+
+	return (error);
 }
 
 static void
@@ -329,6 +383,14 @@ zynqmp_clk_addsysctls(struct zynqmp_clk_softc *sc)
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_dump",
 	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
 	    sc, 0, zynqmp_clk_dump, "I", "dump clock info");
+
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_pl0freq",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
+	    sc, 0, zynqmp_clk_test_set_pl0, "I", "test setting pl0 clk freq");
+
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_vidfreq",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
+	    sc, 0, zynqmp_clk_test_set_vid, "I", "test setting video clock");
 }
 
 /***************************************************************************/
