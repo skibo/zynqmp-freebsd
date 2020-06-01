@@ -228,6 +228,30 @@
 #define PM_REQ_ACK_BLOCKING	2
 #define PM_REQ_ACK_NON_BLOCKING	3
 
+/* PMU return status codes. */
+#define XST_PM_SUCCESS			0
+#define XST_PM_NO_FEATURE		19
+#define XST_PM_INTERNAL			2000
+#define XST_PM_CONFLICT			2001
+#define XST_PM_NO_ACCESS		2002
+#define XST_PM_INVALID_NODE		2003
+#define XST_PM_DOUBLE_REQ		2004
+#define XST_PM_ABORT_SUSPEND		2005
+
+/* Node capabilities */
+#define PM_CAP_ACCESS		1
+#define PM_CAP_CONTEXT		2
+#define PM_CAP_WAKEUP		4
+#define PM_CAP_UNUSABLE		8
+
+/* PMU request ack */
+#define PM_REQUEST_ACK_NO		1
+#define PM_REQUEST_ACK_BLOCKING		2
+#define PM_REQUEST_ACK_NON_BLOCKING	3
+
+#define PM_MAX_QOS		100
+#define PM_MAX_LATENCY		0xffffffffu
+
 /* PM PLL modes */
 #define PM_PLL_MODE_RESET	0
 #define PM_PLL_MODE_INT		1
@@ -298,6 +322,7 @@ int zynqmp_pm_pll_get_param(int, int, uint32_t *);
 int zynqmp_pm_pll_set_mode(int, int);
 int zynqmp_pm_pll_get_mode(int, int *);
 int zynqmp_pm_request_node(int, uint32_t, uint32_t, int);
+int zynqmp_pm_set_requirement(int, uint32_t, uint32_t, int);
 int zynqmp_pm_release_node(int);
 int zynqmp_pm_get_node_status(int, uint32_t *, uint32_t *, uint32_t *);
 #endif /* _KERNEL */

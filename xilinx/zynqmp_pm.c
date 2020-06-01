@@ -115,20 +115,6 @@ __FBSDID("$FreeBSD$");
 
 #define PM_FPGA_READ			46
 
-/* PMU return status codes. */
-#define XST_PM_SUCCESS			0
-#define XST_PM_NO_FEATURE		19
-#define XST_PM_INTERNAL			2000
-#define XST_PM_CONFLICT			2001
-#define XST_PM_NO_ACCESS		2002
-#define XST_PM_INVALID_NODE		2003
-#define XST_PM_DOUBLE_REQ		2004
-#define XST_PM_ABORT_SUSPEND		2005
-
-/* PMU request ack */
-#define ZYNQMP_PM_REQUEST_ACK_NO		1
-#define ZYNQMP_PM_REQUEST_ACK_BLOCKING		2
-#define ZYNQMP_PM_REQUEST_ACK_NON_BLOCKING	3
 
 #define ZPM_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
 #define	ZPM_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
@@ -557,13 +543,23 @@ zynqmp_pm_pll_get_mode(int pll_id, int *mode)
 int
 zynqmp_pm_request_node(int node_id, uint32_t caps, uint32_t qos, int ack)
 {
+
 	return (zynqmp_pm_invoke_fn(PM_REQUEST_NODE, node_id, caps,
+	    qos, ack, NULL));
+}
+
+int
+zynqmp_pm_set_requirement(int node_id, uint32_t req, uint32_t qos, int ack)
+{
+
+	return (zynqmp_pm_invoke_fn(PM_SET_REQUIREMENT, node_id, req,
 	    qos, ack, NULL));
 }
 
 int
 zynqmp_pm_release_node(int node_id)
 {
+
 	return (zynqmp_pm_invoke_fn(PM_RELEASE_NODE, node_id, 0, 0, 0, NULL));
 }
 
@@ -587,6 +583,61 @@ zynqmp_pm_get_node_status(int node_id, uint32_t *status,
 
 	return retv;
 }
+
+/*
+ * What a hack!  Go through device tree looking for power-domain phandles
+ * and check status of the driver.  Register nodes with active drivers.
+ */
+static int
+zynqmp_pm_find_active_nodes(struct zynqmp_pm_softc *sc)
+{
+	phandle_t node;
+	int error;
+	phandle_t xref;
+	pcell_t *cells;
+	int ncells;
+
+	node = OF_finddevice("/amba");
+	if (node <= 0) {
+		device_printf(sc->dev, "can't find /amba in dtb\n");
+		return (-1);
+	}
+
+	for (node = OF_child(node); node > 0; node = OF_peer(node)) {
+		error = ofw_bus_parse_xref_list_alloc(node, "power-domains",
+		    "#power-domain-cells", 0, &xref, &ncells, &cells);
+
+		if (error || !ofw_bus_node_status_okay(node))
+			continue;
+
+		/* printf("%s: found power-domain node=%s (%d)\n",
+		   __func__, node_names[cells[0]], cells[0]); */
+
+		/* Request and set requirements for power node. */
+		error = zynqmp_pm_request_node(cells[0], 0, 0,
+		    PM_REQ_ACK_BLOCKING);
+		if (error) {
+			device_printf(sc->dev, "failed to request node: %d "
+			    "error=%d\n", cells[0], error);
+			continue;
+		}
+		error = zynqmp_pm_set_requirement(cells[0], PM_CAP_ACCESS,
+		    PM_MAX_QOS,	PM_REQ_ACK_BLOCKING);
+		if (error)
+			device_printf(sc->dev, "failed to set requirements: "
+			    "node %d error=%d\n", cells[0], error);
+		OF_prop_free(cells);
+	}
+
+	/* Power down all the unused islands.  */
+	error = zynqmp_pm_init_finalize();
+	if (error)
+		device_printf(sc->dev, "init-finalize failed. err=%d\n",
+		    error);
+
+	return (0);
+}
+
 
 /* XXX: DEBUG */
 static void
@@ -729,6 +780,11 @@ zynqmp_pm_attach(device_t dev)
 	ZPM_LOCK_INIT(sc);
 
 	zynqmp_pm_getsysctls(sc);
+
+	(void)zynqmp_pm_find_active_nodes(sc);
+
+	/* Register node to this driver. */
+	OF_device_register_xref(OF_xref_from_node(node), dev);
 
 	/* Allow devices to identify. */
 	bus_generic_probe(dev);
