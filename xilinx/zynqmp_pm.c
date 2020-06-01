@@ -587,6 +587,9 @@ zynqmp_pm_get_node_status(int node_id, uint32_t *status,
 /*
  * What a hack!  Go through device tree looking for power-domain phandles
  * and check status of the driver.  Register nodes with active drivers.
+ * Perform init-finalize which powers down unused devices and the unused RPUs
+ * (Cortex-R5 cores).  More importantly, it also gives the kernel permissions
+ * to modify clocks associated with the nodes.
  */
 static int
 zynqmp_pm_find_active_nodes(struct zynqmp_pm_softc *sc)
