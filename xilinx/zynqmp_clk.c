@@ -766,7 +766,6 @@ zynqmp_clk_register_clocks(struct zynqmp_clk_softc *sc)
 	struct clknode_init_def clk_def;
 	struct zynqmp_clk_clknode_sc *clksc;
 	struct clknode *clknode;
-	uint64_t freq;
 
 	sc->clkdom = clkdom_create(sc->dev);
 
@@ -872,18 +871,6 @@ zynqmp_clk_register_clocks(struct zynqmp_clk_softc *sc)
 	err = clkdom_finit(sc->clkdom);
 	if (err)
 		goto fail;
-
-	/* Fill out all the frequencies and enable counts. XXX */
-	clkdom_xlock(sc->clkdom);
-	for (id = 0; id < sc->nclks; id++)
-		if (sc->clknodes[id]) {
-			if (clknode_get_freq(sc->clknodes[id], &freq) != 0)
-				DPRINTF("%s: couldn't get freq: name=%s\n",
-				    __func__,
-				    clknode_get_name(sc->clknodes[id]));
-		}
-
-	clkdom_unlock(sc->clkdom);
 
 fail:
 	if (err) {
