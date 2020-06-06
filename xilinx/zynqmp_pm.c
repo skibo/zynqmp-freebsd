@@ -58,6 +58,9 @@ __FBSDID("$FreeBSD$");
  *
  * See: http://www.wiki.xilinx.com/PMU+Firmware
  *
+ * Also See: Embedded Energy Management Interface.  EEMI API Reference Guide.
+ * Xilinx UG1200 (v3.1) October 30, 2019.
+ *
  */
 
 #define PM_SIP_SVC			0xc2000000
