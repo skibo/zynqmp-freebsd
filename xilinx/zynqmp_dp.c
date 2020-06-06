@@ -1392,8 +1392,15 @@ zynqmp_dp_attach(device_t dev)
 	error = clk_get_by_ofw_name(dev, 0, "dp_vtc_pixel_clk_in",
 	    &sc->vref_clk);
 	if (error)
-		device_printf(dev, "warning: could not get video ref clock");
-	else if (!clk_get_freq(sc->vref_clk, &freq64))
+		device_printf(dev,
+		    "warning: could not get video ref clock.\n");
+	else if (clk_enable(sc->vref_clk))
+		device_printf(dev,
+		    "warning: could not enable video ref clock.\n");
+	else if (clk_get_freq(sc->vref_clk, &freq64))
+		device_printf(dev,
+		    "warning: could not get video ref clock frequency.\n");
+	else
 		sc->vref_clk_freq = (int)freq64;
 
 	zynqmp_dp_add_sysctls(sc);
