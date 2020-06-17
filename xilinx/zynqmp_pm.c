@@ -761,7 +761,7 @@ zynqmp_pm_probe(device_t dev)
 
 	device_set_desc(dev, "Zynq UltraScale+ Platform Management Driver");
 
-	return (0);
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int
@@ -792,10 +792,7 @@ zynqmp_pm_attach(device_t dev)
 	/* Register node to this driver. */
 	OF_device_register_xref(OF_xref_from_node(node), dev);
 
-	/* Allow devices to identify. */
-	bus_generic_probe(dev);
-
-	/* Now walk the OFW tree and attach sub-nodes. */
+	/* Walk the fdt and add sub-nodes. */
 	for (node = OF_child(node); node > 0; node = OF_peer(node))
 		simplebus_add_device(dev, node, 0, NULL, -1, NULL);
 

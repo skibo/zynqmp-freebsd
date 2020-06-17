@@ -304,7 +304,8 @@ zynqmp_gpio_probe(device_t dev)
 		return (ENXIO);
 
 	device_set_desc(dev, "Zynq UltraScale+ GPIO driver");
-	return (0);
+
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int zynqmp_gpio_detach(device_t dev);

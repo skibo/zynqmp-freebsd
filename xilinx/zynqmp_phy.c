@@ -318,7 +318,8 @@ zynqmp_phy_probe(device_t dev)
 		return (ENXIO);
 
 	device_set_desc(dev, "Zynq UltraScale+ PHY driver");
-	return (0);
+
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int

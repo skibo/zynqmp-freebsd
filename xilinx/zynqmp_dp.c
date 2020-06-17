@@ -1325,7 +1325,8 @@ zynqmp_dp_probe(device_t dev)
 		return (ENXIO);
 
 	device_set_desc(dev, "Zynq UltraScale+ Display Port device");
-	return (0);
+
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int

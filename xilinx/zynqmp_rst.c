@@ -260,7 +260,7 @@ zynqmp_rst_probe(device_t dev)
 
 	device_set_desc(dev, "Zynq UltraScale+ Reset Driver");
 
-	return (0);
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int
