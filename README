@@ -26,6 +26,13 @@ xilinx/	- drivers.  These files belong in sys/arm64/xilinx.
 	zynqmp_usb.c	- A minimal driver for a few zynq-specific registers
 			  and a container for the dwc3 USB 3.0 driver.
 
+xilinx/clk - clock drivers.
+
+	clk/zynqmp_clk_pll.c
+	clk/zynqmp_clk_pll.h
+	clk/zynqmp_clk_composite.c
+	clk/zynqmp_clk_composite.h
+
 
 dts/	- device tree sources.  I am moving towards using "GNU" upstream
 	  DTS files (from https://github.com/xilinx/linux-xlnx) and away
@@ -40,4 +47,4 @@ should land in the source soon.
 Thomas Skibo
 ThomasSkibo@yahoo.com
 
-May 2020
+June 2020
