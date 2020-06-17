@@ -48,10 +48,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <dev/extres/clk/clk.h>
-#include <dev/extres/clk/clk_div.h>
-#include <dev/extres/clk/clk_mux.h>
 #include <dev/extres/clk/clk_fixed.h>
-#include <dev/extres/clk/clk_gate.h>
+#include <arm64/xilinx/clk/zynqmp_clk_pll.h>
+#include <arm64/xilinx/clk/zynqmp_clk_composite.h>
 
 #include <arm64/xilinx/zynqmp_pm.h>
 
@@ -62,12 +61,9 @@ __FBSDID("$FreeBSD$");
 	    "clk", MTX_DEF)
 #define ZCLK_LOCK_DESTROY(_sc)	mtx_destroy(&_sc->sc_mtx);
 
-#ifdef ZCLK_DEBUG
-static int zynqmp_clk_debug = ZCLK_DEBUG;
-#define DPRINTF(...) do {		\
-	if (zynqmp_clk_debug)		\
-		printf(__VA_ARGS__);	\
-	} while (0)
+#define CLKDEBUG 1
+#ifdef CLKDEBUG
+#define DPRINTF(...)	do { printf(__VA_ARGS__); } while (0)
 #else
 #define DPRINTF(...) do { } while (0)
 #endif
@@ -90,8 +86,6 @@ struct zynqmp_clk_softc {
 	device_t	dev;
 	struct mtx	sc_mtx;
 
-	int		nclks;
-	struct clknode	**clknodes;
 	struct clkdom	*clkdom;
 };
 
@@ -289,130 +283,35 @@ zynqmp_clk_get_max_divisor(int clock_id, int div_id, uint32_t *max_div)
 	return (error);
 }
 
-/* Totally for debuggin. */
-static int
-zynqmp_clk_dump(SYSCTL_HANDLER_ARGS)
-{
-	struct zynqmp_clk_softc *sc = (struct zynqmp_clk_softc *)arg1;
-	int error, i;
-
-	error = sysctl_wire_old_buffer(req, sizeof(int));
-	if (error == 0) {
-		i = 0;
-		error = sysctl_handle_int(oidp, &i, 0, req);
-	}
-	if (error || req->newptr == NULL)
-		return (error);
-
-	clkdom_dump(sc->clkdom);
-
-	return (0);
-}
-
-/* Totally for debuggin.  Get and set pl0 clock (fpga clock 0). */
-static int
-zynqmp_clk_test_set_pl0(SYSCTL_HANDLER_ARGS)
-{
-	struct zynqmp_clk_softc *sc = (struct zynqmp_clk_softc *)arg1;
-	int error, freq;
-	uint64_t freq64;
-
-	error = sysctl_wire_old_buffer(req, sizeof(int));
-	if (error == 0) {
-		clkdom_xlock(sc->clkdom);
-		(void)clknode_get_freq(sc->clknodes[71], &freq64);
-		clkdom_unlock(sc->clkdom);
-		freq = (int)freq64;
-		error = sysctl_handle_int(oidp, &freq, 0, req);
-	}
-	if (error || req->newptr == NULL)
-		return (error);
-
-	freq64 = freq;
-	clkdom_xlock(sc->clkdom);
-	error = clknode_set_freq(sc->clknodes[71], freq64, 0, 0);
-	clkdom_unlock(sc->clkdom);
-
-	return (error);
-}
-
-/* Totally for debuggin.  Get and set dp video ref clock. */
-static int
-zynqmp_clk_test_set_vid(SYSCTL_HANDLER_ARGS)
-{
-	struct zynqmp_clk_softc *sc = (struct zynqmp_clk_softc *)arg1;
-	int error, freq;
-	uint64_t freq64;
-
-	error = sysctl_wire_old_buffer(req, sizeof(int));
-	if (error == 0) {
-		clkdom_xlock(sc->clkdom);
-		(void)clknode_get_freq(sc->clknodes[16], &freq64);
-		clkdom_unlock(sc->clkdom);
-		freq = (int)freq64;
-		error = sysctl_handle_int(oidp, &freq, 0, req);
-	}
-	if (error || req->newptr == NULL)
-		return (error);
-
-	freq64 = freq;
-	clkdom_xlock(sc->clkdom);
-	error = clknode_set_freq(sc->clknodes[16], freq64, 0, 0);
-	clkdom_unlock(sc->clkdom);
-
-	return (error);
-}
-
 static void
-zynqmp_clk_addsysctls(struct zynqmp_clk_softc *sc)
+zynqmp_clk_external(struct zynqmp_clk_softc *sc, struct clk_fixed_def *clkdef)
 {
-	struct sysctl_ctx_list *ctx;
-	struct sysctl_oid_list *child;
+       int error;
+       clk_t clk;
 
-	ctx = device_get_sysctl_ctx(sc->dev);
-	child = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
+       /*
+	* Check if clock is in "clock-names" property in which case it
+	* references a clock in another node (typically fixed-clock
+	* devices).
+	*/
+       error = clk_get_by_ofw_name(sc->dev, 0, clkdef->clkdef.name, &clk);
+       if (!error)
+	       return;
 
-	if (ctx == NULL || child == NULL) {
-		device_printf(sc->dev, "could not add sysctls\n");
-		return;
-	}
-
-	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "nclocks", CTLFLAG_RD,
-	    &sc->nclks, 0, "Number of clocks");
-
-	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_dump",
-	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
-	    sc, 0, zynqmp_clk_dump, "I", "dump clock info");
-
-	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_pl0freq",
-	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
-	    sc, 0, zynqmp_clk_test_set_pl0, "I", "test setting pl0 clk freq");
-
-	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_vidfreq",
-	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
-	    sc, 0, zynqmp_clk_test_set_vid, "I", "test setting video clock");
+       /* Create a dead-end clock node. */
+       clknode_fixed_register(sc->clkdom, clkdef);
 }
 
-/***************************************************************************/
 
-/* Declare zynqmp_clk_clknode_class. */
-
-struct zynqmp_clk_clknode_sc {
-	device_t	dev;
-	int		id;
-	int		pll_id;
-	char		name[CLK_MAX_NAME_LEN];
-	int		nparents;
-	uint32_t	topos[MAX_CLK_TOPO_NODES];
-	int		nodes;
-};
-
-#ifdef ZCLK_DEBUG
+#if 0
 static char *topo_type_names[] = { "invalid", "mux", "pll", "fixed",
 				   "div0", "div1", "gate", "?" };
 #endif
 
-/* Map PLL names to pmu node ids.  See comment in zynqmp_clk_init(). */
+/*
+ * Map PLL names to pmu node ids.  See comment in
+ * zynqmp_clk_register_clocks().
+ */
 static struct {
 	char *name;
 	int node_id;
@@ -425,337 +324,13 @@ static struct {
 	{ NULL, 0 }
 };
 
-static int
-zynqmp_clk_init(struct clknode *clk, device_t dev)
-{
-	struct zynqmp_clk_clknode_sc *sc = clknode_get_softc(clk);
-	int i, j;
-	int err;
-	int parent_idx = 0;
-
-	sc->dev = dev;
-
-#ifdef ZCLK_DEBUG
-	if (zynqmp_clk_debug > 1) {
-		/* Dump topology. */
-		DPRINTF("%s: id=%d name=%s nodes=%d\n", __func__, sc->id,
-		    sc->name, sc->nodes);
-		for (i = 0; i < sc->nodes; i++)
-			DPRINTF("\ttype=%s\n", topo_type_names[sc->topos[i] &
-				GET_TOPO_TYPE_MASK]);
-	}
-#endif
-
-	/*
-	 * Look up PLL node ids based upon the name of the clock.
-	 * XXX This is a hack necessary because I don't see any way to retrieve
-	 * the PLL id from a clock id and the routines to get pll parameters
-	 * through the clock id DON'T WORK.
-	 */
-	for (i = 0; i < sc->nodes; i++)
-		if ((sc->topos[i] & GET_TOPO_TYPE_MASK) == GET_TOPO_TYPE_PLL) {
-			for (j = 0; pll_ids[j].name != NULL; j++)
-				if (strcmp(pll_ids[j].name, sc->name) == 0) {
-					sc->pll_id = pll_ids[j].node_id;
-					break;
-				}
-			break;
-		}
-
-	if (sc->nparents > 1) {
-		err = zynqmp_pm_clock_get_parent(sc->id, &parent_idx);
-		if (err)
-			return (err);
-	}
-
-	clknode_init_parent_idx(clk, parent_idx);
-
-	return (0);
-}
-
-static int
-zynqmp_clk_recalc_freq(struct clknode *clk, uint64_t *freq)
-{
-	struct zynqmp_clk_clknode_sc *sc = clknode_get_softc(clk);
-	int i;
-	int err;
-	uint32_t mult;
-	uint32_t div;
-	int mode;
-	uint32_t fbdiv;
-	uint32_t frac;
-
-	DPRINTF("%s: id=%d name=%s freq=%ld\n", __func__, sc->id, sc->name,
-	    *freq);
-
-	for (i = 0; i < sc->nodes; i++)
-		switch (sc->topos[i] & GET_TOPO_TYPE_MASK) {
-		case GET_TOPO_TYPE_FIXED:
-			err = zynqmp_clk_get_fixed_factor_params(sc->id,
-			    &mult, &div);
-			if (err)
-				return (err);
-			DPRINTF("\tFIXED mult=%d div=%d\n", mult, div);
-			*freq = (*freq * 2 * mult / div + 1) / 2;
-			break;
-		case GET_TOPO_TYPE_PLL:
-			err = zynqmp_pm_pll_get_param(sc->pll_id,
-			    PM_PLL_PARAM_FBDIV, &fbdiv);
-			if (err) {
-				printf("%s: can't get pll param: err=%d\n",
-				    __func__, err);
-				return (err);
-			}
-
-			err = zynqmp_pm_pll_get_mode(sc->pll_id, &mode);
-			if (err) {
-				printf("%s: can't get pll mode: err=%d\n",
-				    __func__, err);
-				return (err);
-			}
-
-			if (mode == PM_PLL_MODE_FRAC) {
-				/* Fractional mode */
-				err = zynqmp_pm_pll_get_param(sc->pll_id,
-				    PM_PLL_PARAM_DATA, &frac);
-				if (err) {
-					printf("%s: can't get pll param: "
-					    "err=%d\n", __func__, err);
-					return (err);
-				}
-
-				DPRINTF("\tPLL FRAC fbdiv=%d frac=0x%x\n",
-				    fbdiv, frac);
-
-				*freq = (((*freq * fbdiv) << 16) +
-				    (*freq * frac) + (1 << 15)) >> 16;
-			} else {
-				/* Integer mode */
-				DPRINTF("\tPLL fbdiv=%d\n", fbdiv);
-				*freq = (*freq * 2 * fbdiv + 1) / 2;
-			}
-
-			/* Round to nearest khz. XXX: doesn't work */
-			*freq = ((*freq + 500) / 1000) * 1000;
-			break;
-		case GET_TOPO_TYPE_DIV0:
-		case GET_TOPO_TYPE_DIV1:
-			err = zynqmp_pm_clock_get_divider(sc->id, &div);
-			if (err)
-				return (err);
-
-			if ((sc->topos[i] & GET_TOPO_TYPE_MASK) ==
-			    GET_TOPO_TYPE_DIV1) {
-				div >>= 16;
-				DPRINTF("\tDIV1: div=%d\n", div);
-			} else {
-				div &= 0xffff;
-				DPRINTF("\tDIV0: div=%d\n", div);
-			}
-
-			*freq = (*freq * 2 / div + 1) / 2;
-			break;
-		}
-
-	return (0);
-}
-
-static int
-zynqmp_clk_set_gate(struct clknode *clk, bool enable)
-{
-	struct zynqmp_clk_clknode_sc *sc = clknode_get_softc(clk);
-	int err;
-	int i;
-
-	DPRINTF("%s: id=%d name=%s enable=%d\n", __func__, sc->id, sc->name,
-	    enable);
-
-	/* Ignore if clock doesn't have a gate. */
-	for (i = 0; i < sc->nodes; i++)
-		if ((sc->topos[i] & GET_TOPO_TYPE_MASK) == GET_TOPO_TYPE_GATE)
-			break;
-	if (i >= sc->nodes)
-		return (0);
-
-	if (enable)
-		err = zynqmp_pm_clock_enable(sc->id);
-	else
-		err = zynqmp_pm_clock_disable(sc->id);
-
-	return (err);
-}
-
-static int
-zynqmp_clk_set_mux(struct clknode *clk, int index)
-{
-	struct zynqmp_clk_clknode_sc *sc = clknode_get_softc(clk);
-
-	DPRINTF("%s: id=%d name=%s index=%d\n", __func__, sc->id,
-	    sc->name, index);
-
-	if (index >= sc->nparents)
-		return (EINVAL);
-
-	return zynqmp_pm_clock_set_parent(sc->id, index);
-}
-
-static int
-zynqmp_clk_set_freq(struct clknode *clk, uint64_t fin, uint64_t *fout,
-    int flags, int *done)
-{
-	struct zynqmp_clk_clknode_sc *sc = clknode_get_softc(clk);
-	int i, error;
-	uint64_t freq_o;
-	uint32_t div0_max, div1_max;
-	u_int div0, div1, freq_err;
-	u_int best_div0, best_div1, best_err;
-
-	DPRINTF("%s: id=%d name=%s fin=%ld flags=0x%x\n", __func__, sc->id,
-	    sc->name, fin, flags);
-
-	for (i = 0; i < sc->nodes; i++)
-		switch (sc->topos[i] & GET_TOPO_TYPE_MASK) {
-		case GET_TOPO_TYPE_PLL:
-			/*
-			 * For now, we cannot set PLLs.  Later, we'll want to
-			 * be able to modify the video PLL.
-			 */
-			return (EINVAL);
-		case GET_TOPO_TYPE_DIV0:
-			error = zynqmp_clk_get_max_divisor(sc->id, 0,
-			    &div0_max);
-			DPRINTF("%s: div0_max=%d err=%d\n", __func__,
-			    div0_max, error);
-			if (error)
-				return (error);
-			if (i + 1 < sc->nodes && (sc->topos[i + 1] &
-			    GET_TOPO_TYPE_MASK) == GET_TOPO_TYPE_DIV1) {
-				/* Two divisors. */
-				error = zynqmp_clk_get_max_divisor(sc->id, 1,
-				    &div1_max);
-				DPRINTF("%s: div1_max=%d err=%d\n", __func__,
-				    div1_max, error);
-				if (error)
-					return (error);
-
-				/* Find best matching divisor pair. */
-				best_div0 = 0;
-				best_div1 = 0;
-				best_err = ~0U;
-
-				for (div0 = 1; div0 <= div0_max; div0++) {
-					div1 = (fin * 2 / *fout / div0 + 1) /
-					    2;
-					if (div1 < 1 || div1 > div1_max)
-						continue;
-
-					freq_o = fin / div0 / div1;
-					freq_err = freq_o > *fout ?
-					    freq_o - *fout : *fout - freq_o;
-					if (freq_err < best_err) {
-						best_err = freq_err;
-						best_div0 = div0;
-						best_div1 = div1;
-					}
-					if (freq_err == 0)
-						break;
-				}
-
-				DPRINTF("%s: fin=%ld freq=%ld best_div0=%u "
-				    "best_div1=%u\n", __func__, fin, *fout,
-				    best_div0, best_div1);
-
-				if (best_div0 == 0)
-					return (EINVAL);
-
-				if ((flags & CLK_SET_DRYRUN) == 0) {
-					error = zynqmp_pm_clock_set_divider(
-					    sc->id, 0, best_div0);
-					if (error)
-						return (error);
-					error = zynqmp_pm_clock_set_divider(
-					    sc->id, 1, best_div1);
-					if (error)
-						return (error);
-				}
-
-				*done = 1;
-				i++;
-			} else {
-				/* Single divisor. */
-				div0 = (2 * fin / *fout + 1) / 2;
-				if (div0 < 1)
-					div0 = 1;
-				else if (div0 > div0_max)
-					div0 = div0_max;
-				DPRINTF("%s: fin=%ld freq=%ld div0=%u\n",
-				    __func__, fin, *fout, div0);
-				if ((flags & CLK_SET_DRYRUN) == 0) {
-					error = zynqmp_pm_clock_set_divider(
-					    sc->id, 0, div0);
-					if (error)
-						return (error);
-				}
-			}
-
-			*done = 1;
-			break;
-		case GET_TOPO_TYPE_DIV1:
-			printf("%s: DIV1 should come right after DIV0.\n",
-			    __func__);
-			return (EINVAL);
-		case GET_TOPO_TYPE_FIXED:
-			return (EINVAL);
-		}
-
-	return (0);
-}
-
-static clknode_method_t zynqmp_clk_clknode_methods[] = {
-	CLKNODEMETHOD(clknode_init,		zynqmp_clk_init),
-	CLKNODEMETHOD(clknode_recalc_freq,	zynqmp_clk_recalc_freq),
-	CLKNODEMETHOD(clknode_set_gate,		zynqmp_clk_set_gate),
-	CLKNODEMETHOD(clknode_set_mux,		zynqmp_clk_set_mux),
-	CLKNODEMETHOD(clknode_set_freq,		zynqmp_clk_set_freq),
-
-	CLKNODEMETHOD_END
-};
-
-DEFINE_CLASS_1(zynqmp_clk_clknode, zynqmp_clk_clknode_class,
-    zynqmp_clk_clknode_methods, sizeof(struct zynqmp_clk_clknode_sc),
-    clknode_class);
-
-
-/***************************************************************************/
-
-static void
-zynqmp_clk_external(struct zynqmp_clk_softc *sc,
-    struct clknode_init_def *clk_def)
-{
-	int err;
-	struct clknode *clknode;
-	clk_t clk;
-
-	/*
-	 * Check if clock is in "clock-names" property in which case it
-	 * references a clock in another node (typically fixed-clock
-	 * devices).
-	 */
-	err = clk_get_by_ofw_name(sc->dev, 0, clk_def->name, &clk);
-	if (!err)
-		return;
-
-	/* Create a dead-end clock node. */
-	clknode = clknode_create(sc->clkdom, &clknode_class, clk_def);
-	clknode_register(sc->clkdom, clknode);
-}
-
 /* Query the platform firmware for the entire clock tree. */
 static int
 zynqmp_clk_register_clocks(struct zynqmp_clk_softc *sc)
 {
 	int id;
-	int err;
+	int error;
+	int nclks;
 	uint32_t retvs[RETV_CNT];
 	uint32_t attrs;
 	char name[CLK_MAX_NAME_LEN];
@@ -763,31 +338,28 @@ zynqmp_clk_register_clocks(struct zynqmp_clk_softc *sc)
 	int nodes;
 	char **parent_names;
 	int nparents;
-	struct clknode_init_def clk_def;
-	struct zynqmp_clk_clknode_sc *clksc;
-	struct clknode *clknode;
+	int i;
+	union {
+		struct clk_fixed_def		fixed;
+		struct zynqmp_clk_pll_def	pll;
+		struct zynqmp_clk_composite_def	composite;
+	} clkdef;
 
 	sc->clkdom = clkdom_create(sc->dev);
 
 	/* Get number of clocks. */
-	if ((err = zynqmp_pm_query_data(PM_QID_CLOCK_GET_NUM_CLOCKS,
+	if ((error = zynqmp_pm_query_data(PM_QID_CLOCK_GET_NUM_CLOCKS,
 	    0, 0, 0, retvs)) < 0) {
 		device_printf(sc->dev, "trouble querying num clocks.\n");
-		return (err);
+		return (error);
 	}
-	sc->nclks = retvs[1];
+	nclks = retvs[1];
 
 	/* Sanity check number of clocks. XXX: necessary? */
-	if (sc->nclks > MAX_CLOCKS)
+	if (nclks > MAX_CLOCKS)
 		return (E2BIG);
-	else if (sc->nclks < 1)
+	else if (nclks < 1)
 		return (EINVAL);
-
-	/* Allocate a table of clknode pointers. */
-	sc->clknodes = malloc(sc->nclks * sizeof(struct clknode *), M_ZCLK,
-	    M_NOWAIT | M_ZERO);
-	if (sc->clknodes == NULL)
-		return (ENOMEM);
 
 	/*
 	 * Allocate space for parent_names parameter to clknode_create().
@@ -796,90 +368,193 @@ zynqmp_clk_register_clocks(struct zynqmp_clk_softc *sc)
 	parent_names = malloc(MAX_CLK_PARENTS * (sizeof(char *) +
 		CLK_MAX_NAME_LEN), M_ZCLK, M_NOWAIT | M_ZERO);
 	if (parent_names == NULL) {
-		err = ENOMEM;
+		device_printf(sc->dev, "could not allocate parent_names\n");
+		error = ENOMEM;
 		goto fail;
 	}
 
-	for (id = 0; id < sc->nclks; id++) {
+	for (id = 0; id < nclks; id++) {
 		/*
 		 * XXX: Skip CLK_LPD_WDT because it is in the
 		 * arm-trusted-firmware platform code but is not in PMU
 		 * firmware so lots of calls to firmware fail.
+		 *
+		 * XXX: what's this magic number!? says andrew@ :-)
 		 */
 		if (id == 112)
 			continue;
 
 		/* Get clock attributes. */
-		err = zynqmp_clk_get_attrs(id, &attrs);
-		if (err)
+		error = zynqmp_clk_get_attrs(id, &attrs);
+		if (error) {
+			device_printf(sc->dev, "could not get attrs id=%d\n",
+			    id);
 			goto fail;
+		}
 		if (!(attrs & GET_ATTRS_VALID))
 			continue;
 
 		/* Get clock name. */
-		err = zynqmp_clk_get_name(id, name);
-		if (err)
+		error = zynqmp_clk_get_name(id, name);
+		if (error) {
+			device_printf(sc->dev, "could not get name id=%d\n",
+			    id);
 			goto fail;
+		}
 
-		memset(&clk_def, 0, sizeof(clk_def));
-		clk_def.id = id;
-		clk_def.name = name;
+		memset(&clkdef, 0, sizeof(clkdef));
+		clkdef.fixed.clkdef.id = id;
+		clkdef.fixed.clkdef.name = name;
 
 		if ((attrs & GET_ATTRS_EXTERNAL) != 0) {
-			zynqmp_clk_external(sc, &clk_def);
+			zynqmp_clk_external(sc, &clkdef.fixed);
 			continue;
 		}
 
 		/* Get topology. */
-		err = zynqmp_clk_get_topology(id, &nodes, topos);
-		if (err)
+		error = zynqmp_clk_get_topology(id, &nodes, topos);
+		if (error) {
+			device_printf(sc->dev, "could not get topo id=%d\n",
+			    id);
 			goto fail;
+		}
 
 		/* Get parents. */
-		err = zynqmp_clk_get_parents(id, parent_names, &nparents);
-		if (err)
+		error = zynqmp_clk_get_parents(id, parent_names, &nparents);
+		if (error) {
+			device_printf(sc->dev, "could not get parents id=%d\n",
+			    id);
 			goto fail;
-		clk_def.parent_names = (const char **)(void *)parent_names;
-		clk_def.parent_cnt = nparents;
+		}
+		clkdef.fixed.clkdef.parent_names = (const char **)(void *)
+		    parent_names;
+		clkdef.fixed.clkdef.parent_cnt = nparents;
 
-#ifdef ZCLK_DEBUG
+#ifdef CLKDEBUG
 		DPRINTF("%s: id=%d name=%s nodes=%d nparents=%d\n",
 		    __func__, id, name, nodes, nparents);
-		if (zynqmp_clk_debug) {
-			int i;
-
-			DPRINTF("%s: parents: ", __func__);
-			for (i = 0; i < nparents; i++)
-				DPRINTF("%s ", parent_names[i]);
-			DPRINTF("\n");
-		}
+		DPRINTF("%s: parents: ", __func__);
+		for (i = 0; i < nparents; i++)
+			DPRINTF("%s ", parent_names[i]);
+		DPRINTF("\n");
 #endif
 
-		clknode = clknode_create(sc->clkdom, &zynqmp_clk_clknode_class,
-		    &clk_def);
-		clksc = clknode_get_softc(clknode);
-		clksc->id = id;
-		memcpy(clksc->topos, topos, nodes * sizeof(uint32_t));
-		memcpy(clksc->name, name, CLK_MAX_NAME_LEN);
-		clksc->nodes = nodes;
-		clksc->nparents = nparents;
-		clknode_register(sc->clkdom, clknode);
+		switch (topos[0] & GET_TOPO_TYPE_MASK) {
+		case GET_TOPO_TYPE_FIXED:
+			KASSERT(nodes == 1,
+			    ("FIXED clock should only have one node.\n"));
 
-		sc->clknodes[id] = clknode;
+			/* Get fixed factors from pmu firmware. */
+			error = zynqmp_clk_get_fixed_factor_params(id,
+			    &clkdef.fixed.mult, &clkdef.fixed.div);
+			if (error) {
+				/* XXX: not sure if this is a failure. */
+				printf("%s: couldn't get fixed factor params: "
+				    "name=%s\n", __func__,
+				    clkdef.fixed.clkdef.name);
+				break;
+			}
+
+			DPRINTF("%s: fixed clock: mult=%d div=%d\n", __func__,
+			    clkdef.fixed.mult, clkdef.fixed.div);
+
+			error = clknode_fixed_register(sc->clkdom,
+			    &clkdef.fixed);
+			break;
+
+		case GET_TOPO_TYPE_PLL:
+			KASSERT(nodes == 1,
+			    ("PLL clock should only have one node.\n"));
+
+			/*
+			 * Look up PLL node ids based upon the name. XXX This
+			 * is a hack necessary because I don't see any way to
+			 * retrieve the PLL id from a clock id and the
+			 * routines to get pll parameters through the clock
+			 * id DON'T WORK.
+			 */
+			for (i = 0; pll_ids[i].name != NULL; i++)
+				if (strcmp(pll_ids[i].name,
+				    clkdef.pll.clkdef.name) == 0)
+					break;
+			if (pll_ids[i].name == NULL) {
+				error = EINVAL;
+				break;
+			}
+			clkdef.pll.pll_id = pll_ids[i].node_id;
+
+			DPRINTF("%s: pll: pll_id=%d\n", __func__,
+			    clkdef.pll.pll_id);
+
+			error = zynqmp_clk_pll_register(sc->clkdom,
+			    &clkdef.pll);
+			break;
+
+		case GET_TOPO_TYPE_MUX:
+		case GET_TOPO_TYPE_DIV0:
+		case GET_TOPO_TYPE_DIV1:
+		case GET_TOPO_TYPE_GATE:
+
+			for (i = 0; i < nodes; i++)
+				switch (topos[i] & GET_TOPO_TYPE_MASK) {
+				case GET_TOPO_TYPE_DIV0:
+				case GET_TOPO_TYPE_DIV1:
+					clkdef.composite.divisors++;
+					break;
+				case GET_TOPO_TYPE_GATE:
+					clkdef.composite.has_gate++;
+					break;
+				}
+
+			if (clkdef.composite.divisors > 0) {
+				error = zynqmp_clk_get_max_divisor(id, 0,
+				    &clkdef.composite.div0_max);
+				if (error) {
+					device_printf(sc->dev,
+					    "could not get max divisor0.\n");
+					goto fail;
+				}
+			}
+			if (clkdef.composite.divisors > 1) {
+				error = zynqmp_clk_get_max_divisor(id, 1,
+				    &clkdef.composite.div1_max);
+				if (error) {
+					device_printf(sc->dev,
+					    "could not get max divisor1.\n");
+					goto fail;
+				}
+			}
+
+			DPRINTF("%s: composite: divs=%d has_gate=%d\n",
+			    __func__, clkdef.composite.divisors,
+			    clkdef.composite.has_gate);
+
+			error = zynqmp_clk_composite_register(sc->clkdom,
+			    &clkdef.composite);
+			break;
+		default:
+			device_printf(sc->dev, "unhandled topo type=%d\n",
+			    topos[0] & GET_TOPO_TYPE_MASK);
+			goto fail;
+			break;
+		}
+
+		if (error) {
+			device_printf(sc->dev,
+			    "failed to register clk id=%d error=%d\n", id,
+			    error);
+			goto fail;
+		}
 	}
 
-	err = clkdom_finit(sc->clkdom);
-	if (err)
-		goto fail;
-
+	error = clkdom_finit(sc->clkdom);
+	if (error)
+		device_printf(sc->dev, "clkdom_finit() failed. error=%d\n",
+		    error);
 fail:
-	if (err) {
-		free(sc->clknodes, M_ZCLK);
-		sc->clknodes = NULL;
-	}
-	/* free on success or failure. */
 	free(parent_names, M_ZCLK);
-	return (err);
+
+	return (error);
 }
 
 static int
@@ -902,15 +577,13 @@ zynqmp_clk_attach(device_t dev)
 {
 	struct zynqmp_clk_softc *sc = device_get_softc(dev);
 	phandle_t node = ofw_bus_get_node(dev);
-	int err;
+	int error;
 
 	sc->dev = dev;
 
-	err = zynqmp_clk_register_clocks(sc);
-	if (err)
-		return (err);
-
-	zynqmp_clk_addsysctls(sc);
+	error = zynqmp_clk_register_clocks(sc);
+	if (error)
+		return (error);
 
 	/* Register node to this driver. */
 	OF_device_register_xref(OF_xref_from_node(node), dev);
@@ -924,11 +597,6 @@ static int
 zynqmp_clk_detach(device_t dev)
 {
 	struct zynqmp_clk_softc *sc = device_get_softc(dev);
-
-	if (sc->clknodes != NULL) {
-		free(sc->clknodes, M_ZCLK);
-		sc->clknodes = NULL;
-	}
 
 	ZCLK_LOCK_DESTROY(sc);
 
