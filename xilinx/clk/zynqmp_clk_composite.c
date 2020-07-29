@@ -146,8 +146,10 @@ zynqmp_clk_composite_set_freq(struct clknode *clk, uint64_t fin,
 	u_int div0, div1, freq_err;
 	u_int best_div0, best_div1, best_err;
 
-	DPRINTF("%s: id=%d fin=%ld flags=0x%x\n", __func__, sc->id, fin,
-	    flags);
+	DPRINTF("%s: id=%d fin=%ld *fout=%ld flags=0x%x\n", __func__,
+	    sc->id, fin, *fout, flags);
+
+	*done = 0;
 
 	if (sc->divisors == 2) {
 		/* Find best matching divisor pair. */
