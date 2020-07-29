@@ -551,6 +551,10 @@ zynqmp_clk_register_clocks(struct zynqmp_clk_softc *sc)
 	if (error)
 		device_printf(sc->dev, "clkdom_finit() failed. error=%d\n",
 		    error);
+
+	if (bootverbose)
+		clkdom_dump(sc->clkdom);
+
 fail:
 	free(parent_names, M_ZCLK);
 
