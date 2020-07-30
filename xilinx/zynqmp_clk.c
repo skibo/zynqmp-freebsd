@@ -1,6 +1,7 @@
 /*-
- * Copyright (c) 2020 Thomas Skibo. <ThomasSkibo@yahoo.com>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2020 Thomas Skibo.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
