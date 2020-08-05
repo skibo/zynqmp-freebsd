@@ -73,7 +73,7 @@ __FBSDID("$FreeBSD$");
 #undef DPRINTF
 #endif
 #ifdef DPDEBUG
-#define DPRINTF(lvl, ...) do { if ((lvl) >= DPDEBUG)	\
+#define DPRINTF(lvl, ...) do { if ((lvl) <= DPDEBUG)	\
 	    printf(__VA_ARGS__); } while (0)
 #else
 #define DPRINTF(...) do { } while (0)
