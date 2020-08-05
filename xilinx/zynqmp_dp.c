@@ -69,6 +69,16 @@ __FBSDID("$FreeBSD$");
  *
  */
 
+#ifdef DPRINTF
+#undef DPRINTF
+#endif
+#ifdef DPDEBUG
+#define DPRINTF(lvl, ...) do { if ((lvl) >= DPDEBUG)	\
+	    printf(__VA_ARGS__); } while (0)
+#else
+#define DPRINTF(...) do { } while (0)
+#endif
+
 static struct ofw_compat_data compat_data[] = {
 	{"xlnx,zynqmp-dp",		1},
 	{"xlnx,zynqmp-dpsub-1.7",	1},
@@ -529,6 +539,8 @@ zynqmp_dp_dump(SYSCTL_HANDLER_ARGS)
 	printf("Dumping registers:\n");
 	printf("  ZYNQMP_DP_PHY_STATUS:\t\t0x%08x\n",
 	    RD4_DP(sc, ZYNQMP_DP_PHY_STATUS));
+	printf("  ZYNQMP_DP_INT_SIGNAL_STATE:\t0x%08x\n",
+	    RD4_DP(sc, ZYNQMP_DP_INTERRUPT_SIGNAL_STATE));
 	printf("  ZYNQMP_DP_INT_STATUS:\t\t0x%08x\n",
 	    RD4_DP(sc, ZYNQMP_DP_INT_STATUS));
 
@@ -704,6 +716,7 @@ zynqmp_dp_aux_writen(struct zynqmp_dp_softc *sc, uint32_t addr,
 static int
 zynqmp_dp_aux_write(struct zynqmp_dp_softc *sc, uint32_t addr, uint8_t data)
 {
+
 	return (zynqmp_dp_aux_writen(sc, addr, &data, 1));
 }
 
@@ -713,6 +726,8 @@ zynqmp_dp_dump_settings(struct zynqmp_dp_softc *sc)
 {
 	int i;
 	uint8_t data[9];
+
+	memset(data, 0xff, sizeof(data));
 
 	if (zynqmp_dp_aux_readn(sc, 0x100, data, 9) < 0)
 		printf("%s: trouble reading aux\n", __func__);
@@ -984,11 +999,10 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 			goto fail;
 		}
 
-		/* XXX: DEBUG
-		printf("%s: patt1: status: %02x %02x %02x %02x %02x %02x\n",
+		DPRINTF(3,
+		    "%s: patt1: status: %02x %02x %02x %02x %02x %02x\n",
 		    __func__, linkstat[0], linkstat[1], linkstat[2],
 		    linkstat[3], linkstat[4], linkstat[5]);
-		*/
 
 		statmask = DP_LANE0_CR_DONE |
 		    (sc->lane_ct > 1 ? DP_LANE1_CR_DONE : 0);
@@ -1041,11 +1055,10 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 			goto fail;
 		}
 
-		/* XXX: DEBUG
-		printf("%s: patt2: status: %02x %02x %02x %02x %02x %02x\n",
+		DPRINTF(3,
+		    "%s: patt2: status: %02x %02x %02x %02x %02x %02x\n",
 		    __func__, linkstat[0], linkstat[1], linkstat[2],
 		    linkstat[3], linkstat[4], linkstat[5]);
-		*/
 
 		statmask = DP_CHANNEL0_EQ_BITS |
 		    (sc->lane_ct > 1 ? DP_CHANNEL1_EQ_BITS : 0);
@@ -1081,14 +1094,16 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 {
 	int error;
 
+	DPRINTF(1, "%s:\n", __func__);
+
 	if (zynqmp_dp_aux_readn(sc, DP_DPCD_REV, sc->dpcd_caps,
 		DPCD_RX_CAP_SIZE) < 0)
 		return;
 
-	/* Debug
+#ifdef DPDEBUG
 	for (int i = 0; i < DPCD_RX_CAP_SIZE; i++)
-		printf("   DP CAPS[%2d]: 0x%02x\n", i, sc->dpcd_caps[i]);
-	*/
+		DPRINTF(1, "   DP CAPS[%2d]: 0x%02x\n", i, sc->dpcd_caps[i]);
+#endif
 
 	/* Get link bw and lane counts. */
 	sc->link_bw = MIN(DP_LINK_BW_5_4, sc->dpcd_caps[DP_MAX_LINK_RATE]);
@@ -1160,6 +1175,9 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 static void
 zynqmp_dp_hpd_down(struct zynqmp_dp_softc *sc)
 {
+
+	DPRINTF(1, "%s:\n", __func__);
+
 	/* Stop DPDMA */
 	zynqmp_dpdma_stop(sc->dpdma_dev, sc->dpdma_chan);
 
@@ -1272,6 +1290,9 @@ zynqmp_dp_get_phys(struct zynqmp_dp_softc *sc)
 	}
 
 	sc->phy_ct = i;
+
+	if (sc->phy_ct == 0)
+		device_printf(sc->dev, "could not locate phys\n");
 
 	return (sc->phy_ct == 0 ? ENXIO : 0);
 }

@@ -62,7 +62,6 @@ __FBSDID("$FreeBSD$");
 	    "clk", MTX_DEF)
 #define ZCLK_LOCK_DESTROY(_sc)	mtx_destroy(&_sc->sc_mtx);
 
-#define CLKDEBUG 1
 #ifdef CLKDEBUG
 #define DPRINTF(...)	do { printf(__VA_ARGS__); } while (0)
 #else

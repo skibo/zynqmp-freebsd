@@ -38,7 +38,6 @@ __FBSDID("$FreeBSD$");
 
 #include "clkdev_if.h"
 
-#define CLKDEBUG
 #ifdef CLKDEBUG
 #define DPRINTF(...)	do { printf(__VA_ARGS__); } while (0)
 #else
