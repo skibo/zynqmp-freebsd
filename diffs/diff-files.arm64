@@ -1,8 +1,8 @@
 Index: sys/conf/files.arm64
 ===================================================================
---- sys/conf/files.arm64	(revision 363353)
+--- sys/conf/files.arm64	(revision 363853)
 +++ sys/conf/files.arm64	(working copy)
-@@ -206,7 +206,7 @@
+@@ -208,7 +208,7 @@
  arm64/coresight/coresight_tmc.c			standard
  arm64/coresight/coresight_tmc_acpi.c		optional acpi
  arm64/coresight/coresight_tmc_fdt.c		optional fdt
@@ -11,10 +11,11 @@ Index: sys/conf/files.arm64
  arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
  arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
  arm64/qoriq/ls1046_gpio.c			optional ls1046_gpio gpio fdt SOC_NXP_LS
-@@ -399,6 +399,18 @@
- arm64/rockchip/clk/rk3399_cru.c		optional fdt soc_rockchip_rk3399
- arm64/rockchip/clk/rk3399_pmucru.c	optional fdt soc_rockchip_rk3399
- 
+@@ -415,3 +415,17 @@
+ arm/freescale/imx/imx_machdep.c		optional fdt soc_freescale_imx8
+ arm64/freescale/imx/imx7gpc.c		optional fdt soc_freescale_imx8
+ dev/ffec/if_ffec.c			optional ffec
++
 +# Xilinx
 +arm64/xilinx/zynqmp_clk.c		optional fdt soc_xilinx_zynq
 +arm64/xilinx/clk/zynqmp_clk_composite.c	optional fdt soc_xilinx_zynq
@@ -26,7 +27,5 @@ Index: sys/conf/files.arm64
 +arm64/xilinx/zynqmp_phy.c		optional fdt soc_xilinx_zynq
 +arm64/xilinx/zynqmp_pm.c		optional fdt soc_xilinx_zynq
 +arm64/xilinx/zynqmp_usb.c		optional fdt soc_xilinx_zynq
-+
- # i.MX8 Clock support
- arm64/freescale/imx/imx8mq_ccm.c	optional fdt soc_freescale_imx8
- arm64/freescale/imx/clk/imx_clk_gate.c	optional fdt soc_freescale_imx8
++arm/xilinx/zy7_qspi.c			optional fdt soc_xilinx_zynq
++arm/xilinx/zy7_spi.c			optional fdt soc_xilinx_zynq
