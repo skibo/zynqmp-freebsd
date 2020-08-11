@@ -69,6 +69,7 @@ __FBSDID("$FreeBSD$");
  *
  */
 
+#define DPDEBUG 3
 #ifdef DPRINTF
 #undef DPRINTF
 #endif
@@ -105,6 +106,8 @@ struct zynqmp_dp_softc {
 
 	clk_t			vref_clk;
 	int			vref_clk_freq;
+	clk_t			apb_clk;
+	int			apb_clk_freq;
 
 	device_t		fbdev;
 	struct fb_info		info;
@@ -178,11 +181,11 @@ struct zynqmp_dp_softc {
 #define    ZYNQMP_DP_AUX_COMMAND_NUM_OF_BYTES_MASK		0xf /* n-1 */
 #define ZYNQMP_DP_AUX_WRITE_FIFO		0x0104
 #define ZYNQMP_DP_AUX_ADDRESS			0x0108
-#define ZYNQMP_DP_AUX_CLOCK_DIVIDER		0x010c
-#define    ZYNQMP_DP_AUX_CLOCK_DIV_AUX_PULSE_WIDTH_MASK		(0xff << 8)
-#define    ZYNQMP_DP_AUX_CLOCK_DIV_AUX_PULSE_WIDTH_SHIFT	8
-#define    ZYNQMP_DP_AUX_CLOCK_DIV_AUX_PULSE_WIDTH(n)		((n) << 8)
-#define    ZYNQMP_DP_AUX_CLOCK_DIVIDER_VAL_MASK			0xff
+#define ZYNQMP_DP_AUX_CLK_DIV			0x010c
+#define    ZYNQMP_DP_AUX_CLK_DIV_AUX_PULSE_W_MASK		(0xff << 8)
+#define    ZYNQMP_DP_AUX_CLK_DIV_AUX_PULSE_W_SHIFT		8
+#define    ZYNQMP_DP_AUX_CLK_DIV_AUX_PULSE_W(n)			((n) << 8)
+#define    ZYNQMP_DP_AUX_CLK_DIV_VAL_MASK			0xff
 #define ZYNQMP_DP_TX_USER_FIFO_OVERFLOW		0x0110
 #define ZYNQMP_DP_INTERRUPT_SIGNAL_STATE	0x0130
 #define    ZYNQMP_DP_INTERRUPT_SIGNAL_STATE_REPLY_TIMEOUT	(1 << 3)
@@ -1203,8 +1206,9 @@ zynqmp_dp_init_hw(struct zynqmp_dp_softc *sc)
 	WR4_DP(sc, ZYNQMP_DP_TRANSMITTER_ENABLE, 0);
 
 	/* Set up AUX clock divider. Reference clock is TOPSW_LSBUS_CLK. */
-	WR4_DP(sc, ZYNQMP_DP_AUX_CLOCK_DIVIDER, 100 |
-	    ZYNQMP_DP_AUX_CLOCK_DIV_AUX_PULSE_WIDTH(48));
+	WR4_DP(sc, ZYNQMP_DP_AUX_CLK_DIV, (sc->apb_clk_freq / 1000000) |
+	    ZYNQMP_DP_AUX_CLK_DIV_AUX_PULSE_W((sc->apb_clk_freq /
+	    16000000) << 3));
 
 	/* Clear PHY reset.  Set 8B10B. */
 	WR4_DP(sc, ZYNQMP_DP_PHY_RESET, ZYNQMP_DP_PHY_RESET_EN_8B_10B);
@@ -1407,7 +1411,7 @@ zynqmp_dp_attach(device_t dev)
 	if (error)
 		goto fail;
 
-	/* Retrieve clock even though we cannot change it yet. */
+	/* Retrieve pixel clock even though we cannot change it yet. */
 	error = clk_get_by_ofw_name(dev, 0, "dp_vtc_pixel_clk_in",
 	    &sc->vref_clk);
 	if (error)
@@ -1421,6 +1425,24 @@ zynqmp_dp_attach(device_t dev)
 		    "warning: could not get video ref clock frequency.\n");
 	else
 		sc->vref_clk_freq = (int)freq64;
+
+	/* Retrieve apb clock. */
+	sc->apb_clk_freq = 100000000; /* it is almost certainly 100 mhz */
+	error = clk_get_by_ofw_name(dev, 0, "dp_apb_clk", &sc->apb_clk);
+	if (error)
+		device_printf(dev,
+		    "warning: could not get apb clock.\n");
+	else if (clk_enable(sc->apb_clk))
+		device_printf(dev,
+		    "warning: could not enable apb clock.\n");
+	else if (clk_get_freq(sc->apb_clk, &freq64))
+		device_printf(dev,
+		    "warning: could not get apb clock frequency.\n");
+	else
+		sc->apb_clk_freq = (int)freq64;
+
+	DPRINTF(1, "%s: vref_clk_freq=%d  apb_clk_freq=%d\n", __func__,
+	    sc->vref_clk_freq, sc->apb_clk_freq);
 
 	zynqmp_dp_add_sysctls(sc);
 
