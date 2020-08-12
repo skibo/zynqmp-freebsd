@@ -69,7 +69,6 @@ __FBSDID("$FreeBSD$");
  *
  */
 
-#define DPDEBUG 3
 #ifdef DPRINTF
 #undef DPRINTF
 #endif
@@ -908,8 +907,12 @@ zynqmp_dp_train_set(struct zynqmp_dp_softc *sc, int p_level, int v_level)
 
 	/* Adjust our PHYs */
 	for (i = 0; i < sc->lane_ct; i++) {
-		zynqmp_phy_margining_factor(sc->phyxref[i], p_level, v_level);
-		zynqmp_phy_override_deemph(sc->phyxref[i], p_level, v_level);
+		if (zynqmp_phy_margining_factor(sc->phyxref[i], p_level,
+		    v_level))
+			return (-2);
+		if (zynqmp_phy_override_deemph(sc->phyxref[i], p_level,
+		    v_level))
+			return (-2);
 		WR4_DP(sc, ZYNQMP_DP_SUB_TX_PHY_PRECURSOR_LANE(i), 2);
 	}
 

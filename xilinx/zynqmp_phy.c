@@ -242,15 +242,15 @@ zynqmp_phy_wait_pll_lock(phandle_t xref)
 		return (ENXIO);
 	sc = device_get_softc(dev);
 	phy = zynqmp_phy_lane_from_xref(sc, xref);
+	if (phy < 0)
+		return (ENXIO);
 
 	ZPHY_LOCK(sc);
-
 	while (--tries > 0) {
 		if (RD4(sc, SERDES_PLL_STATUS(phy)) & SERDES_PLL_STATUS_LOCKED)
 			break;
 		DELAY(1);
 	}
-
 	ZPHY_UNLOCK(sc);
 
 	return (tries > 0 ? 0 : ETIMEDOUT);
@@ -272,6 +272,8 @@ zynqmp_phy_margining_factor(phandle_t xref, int p_level, int v_level)
 		return (ENXIO);
 	sc = device_get_softc(dev);
 	phy = zynqmp_phy_lane_from_xref(sc, xref);
+	if (phy < 0)
+		return (ENXIO);
 
 	ZPHY_LOCK(sc);
 	WR4(sc, SERDES_TXPMD_TM_48_L(phy), vs[p_level][v_level]);
@@ -296,6 +298,8 @@ zynqmp_phy_override_deemph(phandle_t xref, int p_level, int v_level)
 		return (ENXIO);
 	sc = device_get_softc(dev);
 	phy = zynqmp_phy_lane_from_xref(sc, xref);
+	if (phy < 0)
+		return (ENXIO);
 
 	ZPHY_LOCK(sc);
 	WR4(sc, SERDES_TX_ANA_TM_18_L(phy), pe[p_level][v_level]);
