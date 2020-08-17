@@ -133,6 +133,8 @@ struct zynqmp_dp_softc {
 
 	int			pixclk_khz;
 	int			bits_per_pixel;
+
+	int			forcestream;
 };
 
 #define FB_DEPTH		24
@@ -455,6 +457,8 @@ struct zynqmp_dp_softc {
 
 static int zynqmp_dp_attach(device_t);
 static int zynqmp_dp_detach(device_t);
+static void zynqmp_dp_start_stream(struct zynqmp_dp_softc *);
+static void zynqmp_dp_stop_stream(struct zynqmp_dp_softc *);
 
 #define RD4_DP(sc, off)		(bus_read_4((sc)->mem_res[0], (off)))
 #define WR4_DP(sc, off, val)	(bus_write_4((sc)->mem_res[0], (off), (val)))
@@ -554,6 +558,52 @@ zynqmp_dp_dump(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
+/*
+ * _forcestream sysctl is a hook so the dpdma and streamer can be enabled
+ * without a displayport connection.  This is useful for when we want to
+ * send video to a design in the PL (FPGA).  This is kind of a hack for now
+ * and so expect this to go away.
+ */
+static int
+zynqmp_dp_forcestream(SYSCTL_HANDLER_ARGS)
+{
+	int error, i;
+	struct zynqmp_dp_softc *sc = (struct zynqmp_dp_softc *)arg1;
+
+	error = sysctl_wire_old_buffer(req, sizeof(int));
+	if (error == 0) {
+		i = sc->forcestream;
+		error = sysctl_handle_int(oidp, &i, 0, req);
+	}
+	if (error || req->newptr == NULL)
+		return (error);
+
+	ZYNQMP_DP_LOCK(sc);
+	if (!i && sc->forcestream) {
+		if (!sc->hpd_state) {
+			DPRINTF(1, "%s: stopping stream.\n", __func__);
+
+			/* Stop DPDMA and stop stream. */
+			zynqmp_dpdma_stop(sc->dpdma_dev, sc->dpdma_chan);
+			zynqmp_dp_stop_stream(sc);
+		}
+		sc->forcestream = 0;
+	} else if (i && !sc->forcestream) {
+		if (!sc->hpd_state) {
+			DPRINTF(1, "%s: starting stream.\n", __func__);
+
+			/* Turn on stream and start DPDMA. */
+			zynqmp_dp_start_stream(sc);
+			zynqmp_dpdma_start(sc->dpdma_dev, &sc->info,
+			    sc->dpdma_chan);
+		}
+		sc->forcestream = i;
+	}
+	ZYNQMP_DP_UNLOCK(sc);
+
+	return (0);
+}
+
 static void
 zynqmp_dp_get_size(struct zynqmp_dp_softc *sc)
 {
@@ -610,6 +660,10 @@ zynqmp_dp_add_sysctls(struct zynqmp_dp_softc *sc)
 	    &sc->height, 0, "Frame buffer height");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "width", CTLFLAG_RD,
 	    &sc->width, 0, "Frame buffer width");
+
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "_forcestream",
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE,
+	    sc, 0, zynqmp_dp_forcestream, "I", "force stream on for PL video");
 }
 
 static int
@@ -751,6 +805,8 @@ zynqmp_dp_start_stream(struct zynqmp_dp_softc *sc)
 	int init_wait;
 	const int xfer_unit = 64; /* XXX:not sure will ever be configurable. */
 
+	DPRINTF(1, "%s:\n", __func__);
+
 	/* Set up main stream. */
 	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_HTOTAL, sc->width +
 	    sc->h_front_porch + sc->h_sync + sc->h_back_porch);
@@ -812,6 +868,17 @@ zynqmp_dp_start_stream(struct zynqmp_dp_softc *sc)
 	    ZYNQMP_AV_CHBUF_BURST_LEN(15) | ZYNQMP_AV_CHBUF_EN);
 	WR4_AV(sc, ZYNQMP_AV_BUF_OUT_SEL,
 	    ZYNQMP_AV_BUF_OUT_SEL_VID_ST2_ENABLE_MEM);
+}
+
+static void
+zynqmp_dp_stop_stream(struct zynqmp_dp_softc *sc)
+{
+
+	DPRINTF(1, "%s:\n", __func__);
+
+	/* Stop stream. */
+	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_ENABLE, 0);
+	WR4_AV(sc, ZYNQMP_AV_CHBUF(sc->dpdma_chan), 0);
 }
 
 static int
@@ -1047,7 +1114,7 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 
 	/* Training pattern 2. */
 	WR4_DP(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 2);
-	if (zynqmp_dp_aux_write(sc, DP_TRAINING_PATTERN_SET |
+	if (zynqmp_dp_aux_write(sc, DP_TRAINING_PATTERN_SET,
 	    DP_TRAINING_PATTERN_2 | DP_LINK_SCRAMBLING_DISABLE) < 0) {
 		error = -2;
 		goto fail;
@@ -1104,6 +1171,7 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 {
 	int error;
 
+	ZYNQMP_DP_ASSERT_LOCKED(sc);
 	DPRINTF(1, "%s:\n", __func__);
 
 	if (zynqmp_dp_aux_readn(sc, DP_DPCD_REV, sc->dpcd_caps,
@@ -1184,8 +1252,10 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 			break;
 	}
 
-	zynqmp_dp_start_stream(sc);
-	zynqmp_dpdma_start(sc->dpdma_dev, &sc->info, sc->dpdma_chan);
+	if (!sc->forcestream) {
+		zynqmp_dp_start_stream(sc);
+		zynqmp_dpdma_start(sc->dpdma_dev, &sc->info, sc->dpdma_chan);
+	}
 	sc->hpd_state = 1;
 }
 
@@ -1194,13 +1264,13 @@ zynqmp_dp_hpd_down(struct zynqmp_dp_softc *sc)
 {
 
 	DPRINTF(1, "%s:\n", __func__);
+	ZYNQMP_DP_ASSERT_LOCKED(sc);
 
-	/* Stop DPDMA */
-	zynqmp_dpdma_stop(sc->dpdma_dev, sc->dpdma_chan);
-
-	/* Stop stream. */
-	WR4_DP(sc, ZYNQMP_DP_MAIN_STREAM_ENABLE, 0);
-	WR4_AV(sc, ZYNQMP_AV_CHBUF(sc->dpdma_chan), 0);
+	if (!sc->forcestream) {
+		/* Stop DPDMA and stop stream. */
+		zynqmp_dpdma_stop(sc->dpdma_dev, sc->dpdma_chan);
+		zynqmp_dp_stop_stream(sc);
+	}
 
 	sc->hpd_state = 0;
 }
@@ -1479,6 +1549,17 @@ static int
 zynqmp_dp_detach(device_t dev)
 {
 	struct zynqmp_dp_softc *sc = device_get_softc(dev);
+
+	DPRINTF(1, "%s:\n", __func__);
+
+	if (sc->hpd_state || sc->forcestream) {
+		/* Stop DPDMA and stop stream. */
+		zynqmp_dpdma_stop(sc->dpdma_dev, sc->dpdma_chan);
+		zynqmp_dp_stop_stream(sc);
+
+		sc->hpd_state = 0;
+		sc->forcestream = 0;
+	}
 
 	/* Teardown and release interrupt. */
 	if (sc->irq_res != NULL) {
