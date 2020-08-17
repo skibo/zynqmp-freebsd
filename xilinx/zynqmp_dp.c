@@ -119,6 +119,7 @@ struct zynqmp_dp_softc {
 	uint8_t			dpcd_caps[DPCD_RX_CAP_SIZE];
 	int			link_bw;
 	int			lane_ct;
+	int			train_delay;
 
 	int			width;
 	int			h_front_porch;
@@ -391,6 +392,7 @@ struct zynqmp_dp_softc {
 #define DP_TRAINING_PATTERN_SET		0x102
 #define    DP_TRAINING_PATTERN_1		1
 #define    DP_TRAINING_PATTERN_2		2
+#define    DP_TRAINING_PATTERN_3		3
 #define    DP_LINK_SCRAMBLING_DISABLE		(1 << 5)
 #define DP_TRAINING_LANE0_SET		0x103
 #define DP_TRAINING_LANE1_SET		0x104
@@ -996,7 +998,8 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 	samevoltage = 0;
 	tries = 100;
 	while (tries-- > 0) {
-		DELAY(400); /* XXX: check DPCD[0xe] ... */
+		/* XXX: use pause or sleep?  Can be 4ms, is usually 400us. */
+		DELAY(sc->train_delay);
 
 		/* Read link status. */
 		if (zynqmp_dp_aux_readn(sc, DP_LANE0_1_STATUS,
@@ -1044,15 +1047,16 @@ zynqmp_dp_training_day(struct zynqmp_dp_softc *sc)
 
 	/* Training pattern 2. */
 	WR4_DP(sc, ZYNQMP_DP_TRAINING_PATTERN_SET, 2);
-	if (zynqmp_dp_aux_write(sc, DP_TRAINING_PATTERN_SET,
-		DP_TRAINING_PATTERN_2 | DP_LINK_SCRAMBLING_DISABLE) < 0) {
+	if (zynqmp_dp_aux_write(sc, DP_TRAINING_PATTERN_SET |
+	    DP_TRAINING_PATTERN_2 | DP_LINK_SCRAMBLING_DISABLE) < 0) {
 		error = -2;
 		goto fail;
 	}
 
 	tries = 5;
 	while (tries-- > 0) {
-		DELAY(400); /* XXX: check DPCD[0xe] ... */
+		/* XXX: use pause or sleep?  Can be 4ms, is usually 400us. */
+		DELAY(sc->train_delay);
 
 		/* Read link status. */
 		if (zynqmp_dp_aux_readn(sc, DP_LANE0_1_STATUS,
@@ -1156,6 +1160,13 @@ zynqmp_dp_hpd_up(struct zynqmp_dp_softc *sc)
 		device_printf(sc->dev, " DP_SET_POWER failed.\n");
 		return;
 	}
+
+	/* Determine training delay. */
+	if (sc->dpcd_caps[DP_TRAIN_AUX_RD_INTVL])
+		sc->train_delay = 4000 * (sc->dpcd_caps[DP_TRAIN_AUX_RD_INTVL]
+		    & DP_TRAIN_AUX_RD_INTVL_MASK);
+	else
+		sc->train_delay = 400;
 
 	/* Perform training patterns one and two, lower bw if it fails. */
 	for (;;) {
