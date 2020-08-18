@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/fb/fbreg.h>
 #include <dev/vt/vt.h>
+#include <dev/vt/colors/vt_termcolors.h>
 
 #include <arm64/xilinx/zynqmp_phy.h>
 #include <arm64/xilinx/zynqmp_dpdma.h>
@@ -137,7 +138,8 @@ struct zynqmp_dp_softc {
 	int			forcestream;
 };
 
-#define FB_DEPTH		24
+#define FB_DEPTH		32
+#define FB_BPP			32
 #define FB_ALIGN		256
 #define FB_STRIDE_ALIGN		256
 
@@ -152,7 +154,7 @@ struct zynqmp_dp_softc {
 #define DEFAULT_V_BACK_PORCH	36
 
 #define DEFAULT_PIX_CLK_KHZ	148500
-#define DEFAULT_BITS_PER_PIXEL	FB_DEPTH
+#define DEFAULT_BITS_PER_PIXEL	FB_BPP
 
 /* Display Port Module registers.  (Not complete.) */
 #define ZYNQMP_DP_LINK_BW_SET			0x0000
@@ -477,7 +479,7 @@ zynqmp_dp_setup_fbd(struct zynqmp_dp_softc *sc)
 	memset(&sc->info, 0, sizeof(sc->info));
 
 	/* Determine stride and frame buffer size. */
-	sc->fb_stride = sc->width * FB_DEPTH / 8;
+	sc->fb_stride = sc->width * FB_BPP / 8;
 	if (sc->fb_stride % FB_STRIDE_ALIGN != 0)
 		sc->fb_stride += (FB_STRIDE_ALIGN -
 		    sc->fb_stride % FB_STRIDE_ALIGN);
@@ -499,9 +501,18 @@ zynqmp_dp_setup_fbd(struct zynqmp_dp_softc *sc)
 	sc->info.fb_stride = sc->fb_stride;
 	sc->info.fb_width = sc->width;
 	sc->info.fb_height = sc->height;
-	sc->info.fb_depth = sc->info.fb_bpp = FB_DEPTH;
+	sc->info.fb_depth = FB_DEPTH;
+	sc->info.fb_bpp = FB_BPP;
 	sc->info.fb_flags = FB_FLAG_MEMATTR;
 	sc->info.fb_memattr = VM_MEMATTR_WRITE_THROUGH;
+
+	DPRINTF(1, "%s: fb_vbase=%p fb_pbase=%p fb_size=%d fb_stride=%d\n",
+	    __func__, (void *)sc->info.fb_vbase, (void *)sc->info.fb_pbase,
+	    sc->info.fb_size, sc->info.fb_stride);
+
+	vt_generate_cons_palette(sc->info.fb_cmap, COLOR_FORMAT_RGB, 0xff, 0,
+	    0xff, 8, 0xff, 16);
+	sc->info.fb_cmsize = 16;
 
 	sc->fbdev = device_add_child(sc->dev, "fbd", device_get_unit(sc->dev));
 	if (sc->fbdev == NULL) {
@@ -563,8 +574,8 @@ zynqmp_dp_dump(SYSCTL_HANDLER_ARGS)
 /*
  * _forcestream sysctl is a hook so the dpdma and streamer can be enabled
  * without a displayport connection.  This is useful for when we want to
- * send video to a design in the PL (FPGA).  This is kind of a hack for now
- * and so expect this to go away.
+ * send video to a design in the PL (FPGA).  This is a useful feature but
+ * there might be a better way of enabling it than a sysctl.
  */
 static int
 zynqmp_dp_forcestream(SYSCTL_HANDLER_ARGS)
@@ -860,7 +871,7 @@ zynqmp_dp_start_stream(struct zynqmp_dp_softc *sc)
 
 	/* Set up AV buffer manager. */
 	WR4_AV(sc, ZYNQMP_AV_BUF_FORMAT,
-	    ZYNQMP_AV_BUF_FORMAT_NL_GRAPHX_BGR888);
+	    ZYNQMP_AV_BUF_FORMAT_NL_GRAPHX_RGBA8888);
 	WR4_AV(sc, ZYNQMP_AV_BUF_AUD_VID_CLK_SRC,
 	    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_VID_TIMING_PS |
 	    ZYNQMP_AV_BUF_AUD_VID_CLK_SRC_AUD_CLK_PS |

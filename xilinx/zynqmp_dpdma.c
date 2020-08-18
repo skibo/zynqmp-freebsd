@@ -237,8 +237,8 @@ zynqmp_dpdma_start(device_t dev, struct fb_info *info, int channel)
 	    ZYNQMP_DPDMA_DESC_CTRL_IGNORE_DONE |
 	    ZYNQMP_DPDMA_DESC_CTRL_LAST_DESC_FRAME;
 	sc->desc->xfer_size = info->fb_width * info->fb_height *
-	    info->fb_depth / 8;
-	sc->desc->line_size_stride = (info->fb_width * info->fb_depth / 8) |
+	    info->fb_bpp / 8;
+	sc->desc->line_size_stride = (info->fb_width * info->fb_bpp / 8) |
 	    (info->fb_stride << 14);
 	sc->desc->src_addr = info->fb_pbase & 0xffffffffu;
 	sc->desc->next_desc = sc->desc_paddr & 0xffffffffu;
