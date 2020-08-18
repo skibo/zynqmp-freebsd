@@ -500,6 +500,8 @@ zynqmp_dp_setup_fbd(struct zynqmp_dp_softc *sc)
 	sc->info.fb_width = sc->width;
 	sc->info.fb_height = sc->height;
 	sc->info.fb_depth = sc->info.fb_bpp = FB_DEPTH;
+	sc->info.fb_flags = FB_FLAG_MEMATTR;
+	sc->info.fb_memattr = VM_MEMATTR_WRITE_THROUGH;
 
 	sc->fbdev = device_add_child(sc->dev, "fbd", device_get_unit(sc->dev));
 	if (sc->fbdev == NULL) {
