@@ -162,8 +162,7 @@ zynqmp_clk_composite_set_freq(struct clknode *clk, uint64_t fin,
 				continue;
 
 			freq_o = fin / div0 / div1;
-			freq_err = freq_o > *fout ? freq_o - *fout :
-			    *fout - freq_o;
+			freq_err = abs(freq_o - *fout);
 			if (freq_err < best_err) {
 				best_err = freq_err;
 				best_div0 = div0;
