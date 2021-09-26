@@ -1,8 +1,8 @@
-Index: sys/arm64/intel/firmware.c
-===================================================================
---- sys/arm64/intel/firmware.c	(revision 363353)
-+++ sys/arm64/intel/firmware.c	(working copy)
-@@ -58,7 +58,8 @@
+diff --git a/sys/arm64/intel/firmware.c b/sys/arm64/intel/firmware.c
+index 083caaf94755..b65990364b80 100644
+--- a/sys/arm64/intel/firmware.c
++++ b/sys/arm64/intel/firmware.c
+@@ -58,7 +58,8 @@ firmware_probe(device_t dev)
  	 * The firmware node has no property compatible.
  	 * Look for a known child.
  	 */
