@@ -1,8 +1,8 @@
 diff --git a/sys/conf/files.arm64 b/sys/conf/files.arm64
-index 2362c7817025..db81d50bb495 100644
+index 26b9c8ae2215..9d0e74df8479 100644
 --- a/sys/conf/files.arm64
 +++ b/sys/conf/files.arm64
-@@ -363,7 +363,7 @@ arm/allwinner/h6/h6_r_padconf.c			optional soc_allwinner_h6 fdt
+@@ -389,7 +389,7 @@ arm/allwinner/h6/h6_r_padconf.c			optional soc_allwinner_h6 fdt
  
  # Altera/Intel
  dev/altera/dwc/if_dwc_socfpga.c			optional fdt dwc_socfpga
@@ -11,7 +11,7 @@ index 2362c7817025..db81d50bb495 100644
  arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
  arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
  
-@@ -557,4 +557,16 @@ arm64/rockchip/clk/rk3399_cru.c			optional fdt soc_rockchip_rk3399
+@@ -604,4 +604,16 @@ arm64/rockchip/clk/rk3399_cru.c			optional fdt soc_rockchip_rk3399
  arm64/rockchip/clk/rk3399_pmucru.c		optional fdt soc_rockchip_rk3399
  
  # Xilinx

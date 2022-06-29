@@ -1,5 +1,5 @@
 diff --git a/sys/arm64/intel/firmware.c b/sys/arm64/intel/firmware.c
-index 083caaf94755..b65990364b80 100644
+index 5c4470fa4a98..0a174fe79a0f 100644
 --- a/sys/arm64/intel/firmware.c
 +++ b/sys/arm64/intel/firmware.c
 @@ -58,7 +58,8 @@ firmware_probe(device_t dev)
