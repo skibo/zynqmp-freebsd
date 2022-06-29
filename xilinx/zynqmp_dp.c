@@ -510,7 +510,7 @@ zynqmp_dp_setup_fbd(struct zynqmp_dp_softc *sc)
 	    __func__, (void *)sc->info.fb_vbase, (void *)sc->info.fb_pbase,
 	    sc->info.fb_size, sc->info.fb_stride);
 
-	vt_generate_cons_palette(sc->info.fb_cmap, COLOR_FORMAT_RGB, 0xff, 0,
+	vt_config_cons_colors(&sc->info, COLOR_FORMAT_RGB, 0xff, 0,
 	    0xff, 8, 0xff, 16);
 	sc->info.fb_cmsize = 16;
 
