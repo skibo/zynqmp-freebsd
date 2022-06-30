@@ -1,12 +1,11 @@
-Work in progress for FreeBSD on Zynq UltraScale+ (zynqmp).
+A dead project to bring FreeBSD to the Zynq UltraScale+ (zynqmp).
 ==========================================================
 
 These drivers are in various states of maturity.  Use at your own risk.
 
 Directories:
 
-diff/	- patches needed to /usr/src.  At the moment, only sys/conf/files.arm64
-	  needs to include the driver files.
+diffs/	- patches needed to /usr/src.
 
 xilinx/	- drivers.  These files belong in sys/arm64/xilinx.
 
@@ -26,25 +25,15 @@ xilinx/	- drivers.  These files belong in sys/arm64/xilinx.
 	zynqmp_usb.c	- A minimal driver for a few zynq-specific registers
 			  and a container for the dwc3 USB 3.0 driver.
 
-xilinx/clk - clock drivers.
+xilinx/clk - clock drivers.  These files belong in sys/arm64/xilinx/clk.
 
 	clk/zynqmp_clk_pll.c
 	clk/zynqmp_clk_pll.h
 	clk/zynqmp_clk_composite.c
 	clk/zynqmp_clk_composite.h
 
-
-dts/	- device tree sources.  I am moving towards using "GNU" upstream
-	  DTS files (from https://github.com/xilinx/linux-xlnx) and away
-	  from these.  In these dts sources are some work-arounds to allow
-	  a GENERIC kernel to boot on the Ultra-96.
-
-Also, an update to the if_cgem.c driver to support gigabit ethernet on the
-Zynq UltraScale+ is up for review at https://reviews.freebsd.org/D24304  and
-should land in the source soon.
-
 ---
 Thomas Skibo
 ThomasSkibo@yahoo.com
 
-June 2020
+June 2022
