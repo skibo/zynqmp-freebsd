@@ -183,8 +183,5 @@ static device_method_t zynqmp_usb_methods[] = {
 DEFINE_CLASS_1(zynqmp_usb, zynqmp_usb_driver, zynqmp_usb_methods,
     sizeof(struct zynqmp_usb_softc), simplebus_driver);
 
-static devclass_t zynqmp_usb_devclass;
-
-DRIVER_MODULE(zynqmp_usb, simplebus, zynqmp_usb_driver, zynqmp_usb_devclass, \
-    0, 0);
+DRIVER_MODULE(zynqmp_usb, simplebus, zynqmp_usb_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

@@ -169,8 +169,8 @@ zynqmp_fpga_open(struct cdev *dev, int oflags, int devtype,
 	FPGA_SC_UNLOCK(sc);
 
 	/* Allocate bitstream buffer. */
-	sc->bit_vaddr = kmem_alloc_contig(sc->bit_size, M_ZERO, 0, ~0,
-	    4, 0, VM_MEMATTR_WRITE_THROUGH);
+	sc->bit_vaddr = (vm_offset_t)kmem_alloc_contig(sc->bit_size, M_ZERO,
+	    0, ~0, 4, 0, VM_MEMATTR_WRITE_THROUGH);
 	if (sc->bit_vaddr == 0) {
 		sc->is_open = 0;
 		return (ENOMEM);
@@ -202,7 +202,7 @@ zynqmp_fpga_close(struct cdev *dev, int fflag, int devtype,
 	zynqmp_fpga_prog_fpga(sc);
 
 	/* Free up bitstream buffer. */
-	kmem_free(sc->bit_vaddr, sc->bit_size);
+	kmem_free((void *)sc->bit_vaddr, sc->bit_size);
 	sc->bit_vaddr = 0;
 
 	sc->is_open = 0;
@@ -394,9 +394,7 @@ static driver_t zynqmp_fpga_driver = {
 	zynqmp_fpga_methods,
 	sizeof(struct zynqmp_fpga_softc),
 };
-static devclass_t zynqmp_fpga_devclass;
 
-DRIVER_MODULE(zynqmp_fpga, simplebus, zynqmp_fpga_driver, \
-    zynqmp_fpga_devclass, 0, 0);
+DRIVER_MODULE(zynqmp_fpga, simplebus, zynqmp_fpga_driver, 0, 0);
 MODULE_DEPEND(zynqmp_fpga, zynqmp_pm, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

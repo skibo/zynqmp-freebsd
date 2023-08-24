@@ -621,11 +621,9 @@ static driver_t zynqmp_clk_driver = {
 	zynqmp_clk_methods,
 	sizeof(struct zynqmp_clk_softc),
 };
-static devclass_t zynqmp_clk_devclass;
 
 EARLY_DRIVER_MODULE(zynqmp_clk, simplebus, zynqmp_clk_driver,
-    zynqmp_clk_devclass, NULL, NULL,
-    BUS_PASS_TIMER + BUS_PASS_ORDER_EARLY);
+    NULL, NULL, BUS_PASS_TIMER + BUS_PASS_ORDER_EARLY);
 MODULE_VERSION(zynqmp_clk, 1);
 MODULE_DEPEND(zynqmp_clk, zynqmp_pm, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

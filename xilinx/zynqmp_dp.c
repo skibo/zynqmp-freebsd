@@ -486,8 +486,8 @@ zynqmp_dp_setup_fbd(struct zynqmp_dp_softc *sc)
 	sc->fb_size = sc->fb_stride * sc->height;
 
 	/* Allocate frame buffer memory. */
-	sc->fb_vaddr = kmem_alloc_contig(sc->fb_size, M_NOWAIT | M_ZERO, 0, ~0,
-	    FB_ALIGN, 0, VM_MEMATTR_WRITE_THROUGH);
+	sc->fb_vaddr = (vm_offset_t)kmem_alloc_contig(sc->fb_size,
+	    M_NOWAIT | M_ZERO, 0, ~0, FB_ALIGN, 0, VM_MEMATTR_WRITE_THROUGH);
 	if (sc->fb_vaddr == 0) {
 		device_printf(sc->dev, "failed to allocate FB memory\n");
 		return (ENOMEM);
@@ -536,7 +536,7 @@ zynqmp_dp_teardown_fbd(struct zynqmp_dp_softc *sc)
 		sc->fbdev = NULL;
 	}
 	if (sc->fb_vaddr) {
-		kmem_free(sc->fb_vaddr, sc->fb_size);
+		kmem_free((void *)sc->fb_vaddr, sc->fb_size);
 		sc->fb_vaddr = 0;
 	}
 }
@@ -1614,16 +1614,13 @@ static device_method_t zynqmp_dp_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t zynqmp_dp_devclass;
-
 static driver_t zynqmp_dp_driver = {
 	"fb",
 	zynqmp_dp_methods,
 	sizeof(struct zynqmp_dp_softc)
 };
 
-DRIVER_MODULE(zynqmp_dp, simplebus, zynqmp_dp_driver, zynqmp_dp_devclass, \
-    0, 0);
+DRIVER_MODULE(zynqmp_dp, simplebus, zynqmp_dp_driver, 0, 0);
 MODULE_DEPEND(zynqmp_dp, zynqmp_phy, 1, 1, 1);
 MODULE_DEPEND(zynqmp_dp, zynqmp_dpdma, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

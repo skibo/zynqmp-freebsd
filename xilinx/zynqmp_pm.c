@@ -824,10 +824,7 @@ static device_method_t zynqmp_pm_methods[] = {
 DEFINE_CLASS_1(zynqmp_pm, zynqmp_pm_driver, zynqmp_pm_methods,
     sizeof(struct zynqmp_pm_softc), simplebus_driver);
 
-static devclass_t zynqmp_pm_devclass;
-
-EARLY_DRIVER_MODULE(zynqmp_pm, simplebus, zynqmp_pm_driver,
-    zynqmp_pm_devclass, NULL, NULL,
+EARLY_DRIVER_MODULE(zynqmp_pm, simplebus, zynqmp_pm_driver, 0, 0,
     BUS_PASS_TIMER + BUS_PASS_ORDER_EARLY);
 MODULE_VERSION(zynqmp_pm, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

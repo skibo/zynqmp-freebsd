@@ -1,31 +1,20 @@
 diff --git a/sys/conf/files.arm64 b/sys/conf/files.arm64
-index 26b9c8ae2215..9d0e74df8479 100644
+index 2036bbe918ba..04c9ecf8e78e 100644
 --- a/sys/conf/files.arm64
 +++ b/sys/conf/files.arm64
-@@ -389,7 +389,7 @@ arm/allwinner/h6/h6_r_padconf.c			optional soc_allwinner_h6 fdt
- 
- # Altera/Intel
- dev/altera/dwc/if_dwc_socfpga.c			optional fdt dwc_socfpga
--arm64/intel/firmware.c				optional soc_intel_stratix10
-+arm64/intel/firmware.c				optional soc_intel_stratix10 soc_xilinx_zynq
- arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
- arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
- 
-@@ -604,4 +604,16 @@ arm64/rockchip/clk/rk3399_cru.c			optional fdt soc_rockchip_rk3399
- arm64/rockchip/clk/rk3399_pmucru.c		optional fdt soc_rockchip_rk3399
+@@ -696,4 +696,15 @@ arm64/rockchip/clk/rk3568_pmucru.c		optional fdt soc_rockchip_rk3568
  
  # Xilinx
--arm/xilinx/uart_dev_cdnc.c			optional uart soc_xilinx_zynq
-+arm/xilinx/uart_dev_cdnc.c		optional uart soc_xilinx_zynq
-+arm64/xilinx/zynqmp_clk.c		optional fdt soc_xilinx_zynq
-+arm64/xilinx/clk/zynqmp_clk_composite.c	optional fdt soc_xilinx_zynq
-+arm64/xilinx/clk/zynqmp_clk_pll.c	optional fdt soc_xilinx_zynq
-+arm64/xilinx/zynqmp_dp.c		optional fdt vt soc_xilinx_zynq
-+arm64/xilinx/zynqmp_dpdma.c		optional fdt vt soc_xilinx_zynq
-+arm64/xilinx/zynqmp_fpga.c		optional fdt soc_xilinx_zynq
-+arm64/xilinx/zynqmp_gpio.c		optional fdt gpio soc_xilinx_zynq
-+arm64/xilinx/zynqmp_phy.c		optional fdt soc_xilinx_zynq
-+arm64/xilinx/zynqmp_pm.c		optional fdt soc_xilinx_zynq
-+arm64/xilinx/zynqmp_usb.c		optional fdt soc_xilinx_zynq
-+arm/xilinx/zy7_qspi.c			optional fdt soc_xilinx_zynq
-+arm/xilinx/zy7_spi.c			optional fdt soc_xilinx_zynq
+ arm/xilinx/uart_dev_cdnc.c			optional uart soc_xilinx_zynq fdt
++arm64/xilinx/zynqmp_clk.c			optional fdt soc_xilinx_zynq
++arm64/xilinx/clk/zynqmp_clk_composite.c		optional fdt soc_xilinx_zynq
++arm64/xilinx/clk/zynqmp_clk_pll.c		optional fdt soc_xilinx_zynq
++arm64/xilinx/zynqmp_dp.c			optional fdt vt soc_xilinx_zynq
++arm64/xilinx/zynqmp_dpdma.c			optional fdt vt soc_xilinx_zynq
++arm64/xilinx/zynqmp_fpga.c			optional fdt soc_xilinx_zynq
++arm64/xilinx/zynqmp_phy.c			optional fdt soc_xilinx_zynq
++arm64/xilinx/zynqmp_pm.c			optional fdt soc_xilinx_zynq
++arm64/xilinx/zynqmp_usb.c			optional fdt soc_xilinx_zynq
++arm/xilinx/zy7_qspi.c				optional fdt soc_xilinx_zynq
++arm/xilinx/zy7_spi.c				optional fdt soc_xilinx_zynq
+ arm/xilinx/zy7_gpio.c				optional gpio soc_xilinx_zynq fdt

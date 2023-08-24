@@ -404,9 +404,7 @@ static driver_t zynqmp_phy_driver = {
 	zynqmp_phy_methods,
 	sizeof(struct zynqmp_phy_softc),
 };
-static devclass_t zynqmp_phy_devclass;
 
-DRIVER_MODULE(zynqmp_phy, simplebus, zynqmp_phy_driver,	\
-	      zynqmp_phy_devclass, NULL, NULL);
+DRIVER_MODULE(zynqmp_phy, simplebus, zynqmp_phy_driver, 0, 0);
 MODULE_VERSION(zynqmp_phy, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

@@ -302,10 +302,8 @@ static driver_t zynqmp_rst_driver = {
 	zynqmp_rst_methods,
 	sizeof(struct zynqmp_rst_softc),
 };
-static devclass_t zynqmp_rst_devclass;
 
-EARLY_DRIVER_MODULE(zynqmp_rst, simplebus, zynqmp_rst_driver,
-    zynqmp_rst_devclass, NULL, NULL,
+EARLY_DRIVER_MODULE(zynqmp_rst, simplebus, zynqmp_rst_driver, 0, 0, \
     BUS_PASS_TIMER + BUS_PASS_ORDER_EARLY);
 MODULE_VERSION(zynqmp_rst, 1);
 MODULE_DEPEND(zynqmp_rst, zynqmp_pm, 1, 1, 1);

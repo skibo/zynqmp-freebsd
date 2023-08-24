@@ -390,14 +390,11 @@ static device_method_t zynqmp_dpdma_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t zynqmp_dpdma_devclass;
-
 static driver_t zynqmp_dpdma_driver = {
 	"zynqmp_dpdma",
 	zynqmp_dpdma_methods,
 	sizeof(struct zynqmp_dpdma_softc)
 };
 
-DRIVER_MODULE(zynqmp_dpdma, simplebus, zynqmp_dpdma_driver, \
-    zynqmp_dpdma_devclass, 0, 0);
+DRIVER_MODULE(zynqmp_dpdma, simplebus, zynqmp_dpdma_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

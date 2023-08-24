@@ -379,8 +379,6 @@ static driver_t zynqmp_gpio_driver = {
 	zynqmp_gpio_methods,
 	sizeof(struct zynqmp_gpio_softc),
 };
-static devclass_t zynqmp_gpio_devclass;
 
-DRIVER_MODULE(zynqmp_gpio, simplebus, zynqmp_gpio_driver,	\
-	      zynqmp_gpio_devclass, NULL, NULL);
+DRIVER_MODULE(zynqmp_gpio, simplebus, zynqmp_gpio_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

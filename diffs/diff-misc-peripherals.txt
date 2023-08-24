@@ -1,8 +1,8 @@
 diff --git a/sys/arm/xilinx/zy7_qspi.c b/sys/arm/xilinx/zy7_qspi.c
-index 1915f93608ba..fe46086eadb6 100644
+index d639c0bb02cf..3debd176cf17 100644
 --- a/sys/arm/xilinx/zy7_qspi.c
 +++ b/sys/arm/xilinx/zy7_qspi.c
-@@ -59,11 +59,16 @@ __FBSDID("$FreeBSD$");
+@@ -57,11 +57,16 @@
  
  #include <dev/flash/mx25lreg.h>
  
@@ -19,7 +19,7 @@ index 1915f93608ba..fe46086eadb6 100644
  	{NULL,				0}
  };
  
-@@ -77,8 +82,11 @@ struct zy7_qspi_softc {
+@@ -75,8 +80,11 @@ struct zy7_qspi_softc {
  
  	uint32_t		cfg_reg_shadow;
  	uint32_t		lqspi_cfg_shadow;
@@ -33,7 +33,7 @@ index 1915f93608ba..fe46086eadb6 100644
  	unsigned int		spi_clk_real_freq;
  	unsigned int		rx_overflows;
  	unsigned int		tx_underflows;
-@@ -95,7 +103,7 @@ struct zy7_qspi_softc {
+@@ -93,7 +101,7 @@ struct zy7_qspi_softc {
  	int			is_dio;
  };
  
@@ -42,7 +42,7 @@ index 1915f93608ba..fe46086eadb6 100644
  
  #define QSPI_SC_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
  #define	QSPI_SC_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
-@@ -435,15 +443,16 @@ zy7_qspi_init_hw(struct zy7_qspi_softc *sc)
+@@ -433,15 +441,16 @@ zy7_qspi_init_hw(struct zy7_qspi_softc *sc)
  
  	/* Find best clock divider. */
  	baud_div = 0;
@@ -63,7 +63,7 @@ index 1915f93608ba..fe46086eadb6 100644
  
  	/*
  	 * If divider is 2 (the max speed), use internal loopback master
-@@ -535,6 +544,9 @@ zy7_qspi_attach(device_t dev)
+@@ -533,6 +542,9 @@ zy7_qspi_attach(device_t dev)
  	int rid, err;
  	phandle_t node;
  	pcell_t cell;
@@ -73,7 +73,7 @@ index 1915f93608ba..fe46086eadb6 100644
  
  	sc = device_get_softc(dev);
  	sc->dev = dev;
-@@ -544,15 +556,27 @@ zy7_qspi_attach(device_t dev)
+@@ -542,15 +554,27 @@ zy7_qspi_attach(device_t dev)
  	/* Get ref-clock, spi-clock, and other properties. */
  	node = ofw_bus_get_node(dev);
  	if (OF_getprop(node, "ref-clock", &cell, sizeof(cell)) > 0)
@@ -105,7 +105,7 @@ index 1915f93608ba..fe46086eadb6 100644
  	if (OF_getprop(node, "is-stacked", &cell, sizeof(cell)) > 0 &&
  	    fdt32_to_cpu(cell) != 0) {
  		sc->is_dual = 1;
-@@ -645,6 +669,13 @@ zy7_qspi_detach(device_t dev)
+@@ -643,6 +667,13 @@ zy7_qspi_detach(device_t dev)
  		bus_release_resource(dev, SYS_RES_MEMORY,
  		    rman_get_rid(sc->mem_res), sc->mem_res);
  
@@ -120,10 +120,10 @@ index 1915f93608ba..fe46086eadb6 100644
  
  	return (0);
 diff --git a/sys/arm/xilinx/zy7_spi.c b/sys/arm/xilinx/zy7_spi.c
-index 187be191c793..a6b6637257c2 100644
+index 0010cd6e00a0..3d3ca99cf571 100644
 --- a/sys/arm/xilinx/zy7_spi.c
 +++ b/sys/arm/xilinx/zy7_spi.c
-@@ -52,11 +52,16 @@ __FBSDID("$FreeBSD$");
+@@ -48,11 +48,16 @@
  #include <dev/spibus/spi.h>
  #include <dev/spibus/spibusvar.h>
  
@@ -140,7 +140,7 @@ index 187be191c793..a6b6637257c2 100644
  	{"cdns,spi-r1p6",		1},
  	{NULL,				0}
  };
-@@ -70,8 +75,11 @@ struct zy7_spi_softc {
+@@ -66,8 +71,11 @@ struct zy7_spi_softc {
  	void			*intrhandle;
  
  	uint32_t		cfg_reg_shadow;
@@ -154,7 +154,7 @@ index 187be191c793..a6b6637257c2 100644
  	unsigned int		spi_clk_real_freq;
  	unsigned int		rx_overflows;
  	unsigned int		tx_underflows;
-@@ -85,7 +93,7 @@ struct zy7_spi_softc {
+@@ -81,7 +89,7 @@ struct zy7_spi_softc {
  	int			busy;
  };
  
@@ -163,7 +163,7 @@ index 187be191c793..a6b6637257c2 100644
  
  #define SPI_SC_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
  #define	SPI_SC_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
-@@ -302,15 +310,16 @@ zy7_spi_init_hw(struct zy7_spi_softc *sc)
+@@ -298,15 +306,16 @@ zy7_spi_init_hw(struct zy7_spi_softc *sc)
  
  	/* Find best clock divider. Divide by 2 not supported. */
  	baud_div = 1;
@@ -184,7 +184,7 @@ index 187be191c793..a6b6637257c2 100644
  
  	/* Set up configuration register. */
  	sc->cfg_reg_shadow =
-@@ -384,6 +393,9 @@ zy7_spi_attach(device_t dev)
+@@ -380,6 +389,9 @@ zy7_spi_attach(device_t dev)
  	int rid, err;
  	phandle_t node;
  	pcell_t cell;
@@ -194,7 +194,7 @@ index 187be191c793..a6b6637257c2 100644
  
  	sc = device_get_softc(dev);
  	sc->dev = dev;
-@@ -393,15 +405,27 @@ zy7_spi_attach(device_t dev)
+@@ -389,15 +401,27 @@ zy7_spi_attach(device_t dev)
  	/* Get ref-clock and spi-clock properties. */
  	node = ofw_bus_get_node(dev);
  	if (OF_getprop(node, "ref-clock", &cell, sizeof(cell)) > 0)
@@ -226,7 +226,7 @@ index 187be191c793..a6b6637257c2 100644
  
  	/* Get memory resource. */
  	rid = 0;
-@@ -484,6 +508,13 @@ zy7_spi_detach(device_t dev)
+@@ -480,6 +504,13 @@ zy7_spi_detach(device_t dev)
  		bus_release_resource(dev, SYS_RES_MEMORY,
  		    rman_get_rid(sc->mem_res), sc->mem_res);
  
@@ -240,7 +240,7 @@ index 187be191c793..a6b6637257c2 100644
  	SPI_SC_LOCK_DESTROY(sc);
  
  	return (0);
-@@ -513,7 +544,7 @@ zy7_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
+@@ -509,7 +540,7 @@ zy7_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
  	spibus_get_cs(child, &cs);
  	cs &= ~SPIBUS_CS_HIGH;
  	if (cs > 2) {
@@ -250,74 +250,15 @@ index 187be191c793..a6b6637257c2 100644
  		return (EINVAL);
  	}
 diff --git a/sys/dev/sdhci/sdhci_fdt.c b/sys/dev/sdhci/sdhci_fdt.c
-index f7e6eb27d180..c3a95b53ab01 100644
+index 4a355d6514ad..7b71ccd51356 100644
 --- a/sys/dev/sdhci/sdhci_fdt.c
 +++ b/sys/dev/sdhci/sdhci_fdt.c
-@@ -73,7 +73,7 @@ __FBSDID("$FreeBSD$");
- #define	MAX_SLOTS		6
- #define	SDHCI_FDT_ARMADA38X	1
- #define	SDHCI_FDT_GENERIC	2
--#define	SDHCI_FDT_XLNX_ZY7	3
-+#define	SDHCI_FDT_XLNX_ZYNQ	3
- #define	SDHCI_FDT_QUALCOMM	4
- #define	SDHCI_FDT_RK3399	5
- 
-@@ -94,7 +94,9 @@ static struct ofw_compat_data compat_data[] = {
- 	{ "sdhci_generic",		SDHCI_FDT_GENERIC },
- 	{ "qcom,sdhci-msm-v4",		SDHCI_FDT_QUALCOMM },
- 	{ "rockchip,rk3399-sdhci-5.1",	SDHCI_FDT_RK3399 },
--	{ "xlnx,zy7_sdhci",		SDHCI_FDT_XLNX_ZY7 },
-+	{ "xlnx,zy7_sdhci",		SDHCI_FDT_XLNX_ZYNQ },
-+	{ "arasan,sdhci-8.9a",		SDHCI_FDT_XLNX_ZYNQ },
-+	{ "xlnx,zynqmp-8.9a",		SDHCI_FDT_XLNX_ZYNQ },
- 	{ NULL, 0 }
- };
- 
-@@ -112,6 +114,7 @@ struct sdhci_fdt_softc {
- 	struct resource	*mem_res[MAX_SLOTS];	/* Memory resource */
- 
- 	bool		wp_inverted;	/* WP pin is inverted */
-+	bool		wp_disabled;	/* disable WP altogether */
- 	bool		no_18v;		/* No 1.8V support */
- 
- 	clk_t		clk_xin;	/* xin24m fixed clock */
-@@ -401,7 +404,8 @@ sdhci_fdt_get_ro(device_t bus, device_t dev)
- {
- 	struct sdhci_fdt_softc *sc = device_get_softc(bus);
- 
--	return (sdhci_generic_get_ro(bus, dev) ^ sc->wp_inverted);
-+	return (!sc->wp_disabled && (sdhci_generic_get_ro(bus, dev) ^
-+				     sc->wp_inverted));
- }
- 
- static int
-@@ -435,9 +439,9 @@ sdhci_fdt_probe(device_t dev)
- 	case SDHCI_FDT_RK3399:
- 		device_set_desc(dev, "Rockchip RK3399 fdt SDHCI controller");
- 		break;
--	case SDHCI_FDT_XLNX_ZY7:
-+	case SDHCI_FDT_XLNX_ZYNQ:
- 		sc->quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
--		device_set_desc(dev, "Zynq-7000 generic fdt SDHCI controller");
-+		device_set_desc(dev, "Zynq generic fdt SDHCI controller");
- 		break;
- 	default:
- 		return (ENXIO);
-@@ -456,6 +460,8 @@ sdhci_fdt_probe(device_t dev)
- 		sc->no_18v = true;
- 	if (OF_hasprop(node, "wp-inverted"))
- 		sc->wp_inverted = true;
-+	if (OF_hasprop(node, "disable-wp"))
-+		sc->wp_disabled = true;
- 
- 	return (0);
- }
-@@ -486,6 +492,20 @@ sdhci_fdt_attach(device_t dev)
+@@ -587,6 +587,20 @@ sdhci_fdt_attach(device_t dev)
  			device_printf(dev, "Cannot init RK3399 SDHCI\n");
  			return (err);
  		}
 +	} else if (ofw_bus_search_compatible(dev, compat_data)->ocd_data ==
-+	    SDHCI_FDT_XLNX_ZYNQ) {
++	    SDHCI_FDT_XLNX_ZMP) {
 +		int64_t freq;
 +
 +		if (clk_get_by_ofw_name(dev, 0, "clk_xin", &sc->clk_xin) != 0)
@@ -332,8 +273,8 @@ index f7e6eb27d180..c3a95b53ab01 100644
 +			sc->max_clk = (uint32_t)freq;
  	}
  
- 	/* Scan all slots. */
-@@ -548,6 +568,11 @@ sdhci_fdt_detach(device_t dev)
+ 	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data ==
+@@ -659,6 +673,11 @@ sdhci_fdt_detach(device_t dev)
  		    rman_get_rid(sc->mem_res[i]), sc->mem_res[i]);
  	}
  
