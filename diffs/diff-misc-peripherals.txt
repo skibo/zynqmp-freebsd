@@ -1,14 +1,12 @@
 diff --git a/sys/arm/xilinx/zy7_qspi.c b/sys/arm/xilinx/zy7_qspi.c
-index d639c0bb02cf..3debd176cf17 100644
+index d639c0bb02cf..9cc007e92cc1 100644
 --- a/sys/arm/xilinx/zy7_qspi.c
 +++ b/sys/arm/xilinx/zy7_qspi.c
-@@ -57,11 +57,16 @@
+@@ -57,11 +57,14 @@
  
  #include <dev/flash/mx25lreg.h>
  
-+#ifdef EXT_RESOURCES
 +#include <dev/extres/clk/clk.h>
-+#endif
 +
  #include "spibus_if.h"
  
@@ -19,21 +17,19 @@ index d639c0bb02cf..3debd176cf17 100644
  	{NULL,				0}
  };
  
-@@ -75,8 +80,11 @@ struct zy7_qspi_softc {
+@@ -75,8 +78,9 @@ struct zy7_qspi_softc {
  
  	uint32_t		cfg_reg_shadow;
  	uint32_t		lqspi_cfg_shadow;
 -	uint32_t		spi_clock;
 -	uint32_t		ref_clock;
 +	uint32_t		spi_clk_freq;
-+#ifdef EXT_RESOURCES
 +	clk_t			ref_clk;
-+#endif
 +	uint32_t		ref_clk_freq;
  	unsigned int		spi_clk_real_freq;
  	unsigned int		rx_overflows;
  	unsigned int		tx_underflows;
-@@ -93,7 +101,7 @@ struct zy7_qspi_softc {
+@@ -93,7 +97,7 @@ struct zy7_qspi_softc {
  	int			is_dio;
  };
  
@@ -42,7 +38,7 @@ index d639c0bb02cf..3debd176cf17 100644
  
  #define QSPI_SC_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
  #define	QSPI_SC_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
-@@ -433,15 +441,16 @@ zy7_qspi_init_hw(struct zy7_qspi_softc *sc)
+@@ -433,15 +437,16 @@ zy7_qspi_init_hw(struct zy7_qspi_softc *sc)
  
  	/* Find best clock divider. */
  	baud_div = 0;
@@ -63,23 +59,20 @@ index d639c0bb02cf..3debd176cf17 100644
  
  	/*
  	 * If divider is 2 (the max speed), use internal loopback master
-@@ -533,6 +542,9 @@ zy7_qspi_attach(device_t dev)
+@@ -533,6 +538,7 @@ zy7_qspi_attach(device_t dev)
  	int rid, err;
  	phandle_t node;
  	pcell_t cell;
-+#ifdef EXT_RESOURCES
 +	uint64_t freq;
-+#endif
  
  	sc = device_get_softc(dev);
  	sc->dev = dev;
-@@ -542,15 +554,27 @@ zy7_qspi_attach(device_t dev)
+@@ -542,15 +548,25 @@ zy7_qspi_attach(device_t dev)
  	/* Get ref-clock, spi-clock, and other properties. */
  	node = ofw_bus_get_node(dev);
  	if (OF_getprop(node, "ref-clock", &cell, sizeof(cell)) > 0)
 -		sc->ref_clock = fdt32_to_cpu(cell);
 +		sc->ref_clk_freq = fdt32_to_cpu(cell);
-+#ifdef EXT_RESOURCES
 +	else if (clk_get_by_ofw_name(dev, 0, "ref_clk", &sc->ref_clk) == 0) {
 +		if ((err = clk_enable(sc->ref_clk)) != 0)
 +			device_printf(dev, "Cannot enable clock. err=%d.\n",
@@ -90,7 +83,6 @@ index d639c0bb02cf..3debd176cf17 100644
 +		else
 +			sc->ref_clk_freq = (uint32_t)freq;
 +	}
-+#endif
  	else {
 -		device_printf(dev, "must have ref-clock property\n");
 +		device_printf(dev, "must have reference clock property.\n");
@@ -105,31 +97,27 @@ index d639c0bb02cf..3debd176cf17 100644
  	if (OF_getprop(node, "is-stacked", &cell, sizeof(cell)) > 0 &&
  	    fdt32_to_cpu(cell) != 0) {
  		sc->is_dual = 1;
-@@ -643,6 +667,13 @@ zy7_qspi_detach(device_t dev)
+@@ -643,6 +659,11 @@ zy7_qspi_detach(device_t dev)
  		bus_release_resource(dev, SYS_RES_MEMORY,
  		    rman_get_rid(sc->mem_res), sc->mem_res);
  
-+#ifdef EXT_RESOURCES
 +	if (sc->ref_clk != NULL) {
 +		clk_release(sc->ref_clk);
 +		sc->ref_clk = NULL;
 +	}
-+#endif
 +
  	QSPI_SC_LOCK_DESTROY(sc);
  
  	return (0);
 diff --git a/sys/arm/xilinx/zy7_spi.c b/sys/arm/xilinx/zy7_spi.c
-index 0010cd6e00a0..3d3ca99cf571 100644
+index 0010cd6e00a0..86423802d008 100644
 --- a/sys/arm/xilinx/zy7_spi.c
 +++ b/sys/arm/xilinx/zy7_spi.c
-@@ -48,11 +48,16 @@
+@@ -48,11 +48,14 @@
  #include <dev/spibus/spi.h>
  #include <dev/spibus/spibusvar.h>
  
-+#ifdef EXT_RESOURCES
 +#include <dev/extres/clk/clk.h>
-+#endif
 +
  #include "spibus_if.h"
  
@@ -140,21 +128,19 @@ index 0010cd6e00a0..3d3ca99cf571 100644
  	{"cdns,spi-r1p6",		1},
  	{NULL,				0}
  };
-@@ -66,8 +71,11 @@ struct zy7_spi_softc {
+@@ -66,8 +69,9 @@ struct zy7_spi_softc {
  	void			*intrhandle;
  
  	uint32_t		cfg_reg_shadow;
 -	uint32_t		spi_clock;
 -	uint32_t		ref_clock;
 +	uint32_t		spi_clk_freq;
-+#ifdef EXT_RESOURCES
 +	clk_t			ref_clk;
-+#endif
 +	uint32_t		ref_clk_freq;
  	unsigned int		spi_clk_real_freq;
  	unsigned int		rx_overflows;
  	unsigned int		tx_underflows;
-@@ -81,7 +89,7 @@ struct zy7_spi_softc {
+@@ -81,7 +85,7 @@ struct zy7_spi_softc {
  	int			busy;
  };
  
@@ -163,7 +149,7 @@ index 0010cd6e00a0..3d3ca99cf571 100644
  
  #define SPI_SC_LOCK(sc)		mtx_lock(&(sc)->sc_mtx)
  #define	SPI_SC_UNLOCK(sc)		mtx_unlock(&(sc)->sc_mtx)
-@@ -298,15 +306,16 @@ zy7_spi_init_hw(struct zy7_spi_softc *sc)
+@@ -298,15 +302,16 @@ zy7_spi_init_hw(struct zy7_spi_softc *sc)
  
  	/* Find best clock divider. Divide by 2 not supported. */
  	baud_div = 1;
@@ -184,23 +170,20 @@ index 0010cd6e00a0..3d3ca99cf571 100644
  
  	/* Set up configuration register. */
  	sc->cfg_reg_shadow =
-@@ -380,6 +389,9 @@ zy7_spi_attach(device_t dev)
+@@ -380,6 +385,7 @@ zy7_spi_attach(device_t dev)
  	int rid, err;
  	phandle_t node;
  	pcell_t cell;
-+#ifdef EXT_RESOURCES
 +	uint64_t freq;
-+#endif
  
  	sc = device_get_softc(dev);
  	sc->dev = dev;
-@@ -389,15 +401,27 @@ zy7_spi_attach(device_t dev)
+@@ -389,15 +395,25 @@ zy7_spi_attach(device_t dev)
  	/* Get ref-clock and spi-clock properties. */
  	node = ofw_bus_get_node(dev);
  	if (OF_getprop(node, "ref-clock", &cell, sizeof(cell)) > 0)
 -		sc->ref_clock = fdt32_to_cpu(cell);
 +		sc->ref_clk_freq = fdt32_to_cpu(cell);
-+#ifdef EXT_RESOURCES
 +	else if (clk_get_by_ofw_name(dev, 0, "ref_clk", &sc->ref_clk) == 0) {
 +		if ((err = clk_enable(sc->ref_clk)) != 0)
 +			device_printf(dev, "Cannot enable clock. err=%d.\n",
@@ -211,7 +194,6 @@ index 0010cd6e00a0..3d3ca99cf571 100644
 +		else
 +			sc->ref_clk_freq = (uint32_t)freq;
 +	}
-+#endif
  	else {
 -		device_printf(dev, "must have ref-clock property\n");
 +		device_printf(dev, "must have reference clock property.\n");
@@ -226,21 +208,19 @@ index 0010cd6e00a0..3d3ca99cf571 100644
  
  	/* Get memory resource. */
  	rid = 0;
-@@ -480,6 +504,13 @@ zy7_spi_detach(device_t dev)
+@@ -480,6 +496,11 @@ zy7_spi_detach(device_t dev)
  		bus_release_resource(dev, SYS_RES_MEMORY,
  		    rman_get_rid(sc->mem_res), sc->mem_res);
  
-+#ifdef EXT_RESOURCES
 +	if (sc->ref_clk != NULL) {
 +		clk_release(sc->ref_clk);
 +		sc->ref_clk = NULL;
 +	}
-+#endif
 +
  	SPI_SC_LOCK_DESTROY(sc);
  
  	return (0);
-@@ -509,7 +540,7 @@ zy7_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
+@@ -509,7 +530,7 @@ zy7_spi_transfer(device_t dev, device_t child, struct spi_command *cmd)
  	spibus_get_cs(child, &cs);
  	cs &= ~SPIBUS_CS_HIGH;
  	if (cs > 2) {
